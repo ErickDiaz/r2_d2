@@ -25,7 +25,7 @@ import logging
 import platform
 import subprocess
 import sys
-
+import os
 from google.assistant.library.event import EventType
 
 from aiy.assistant import auth_helpers
@@ -37,6 +37,11 @@ from pygame import mixer
 
 SOUNDS_DATA = None
 SOUNDS_PATH = 'sounds/'
+
+## SPOT ##
+SPOT_HOST=os.getenv('SPOT_HOST')
+SPOT_USER=os.getenv('SPOT_USER')
+SPOT_PATH=os.getenv('SPOT_PATH')
 
 def power_off_pi():
     tts.say('Good bye!')
@@ -79,7 +84,12 @@ def process_event(assistant, led, event):
         elif text == 'puto':
             tts.say('puto')
         elif text == 'activa el spot':
-            tts.say('Spot micro AI is starting')    
+            mixer.music.load(SOUNDS_PATH+'eureka.mp3')
+            mixer.music.play()
+            ## Excecute command
+            print(SPOT_USER)
+            print(SPOT_HOST)
+            os.system("ssh "+SPOT_USER+"@"+SPOT_HOST+" 'python3 "+SPOT_PATH+"/initial_position.py'")
     elif event.type == EventType.ON_END_OF_UTTERANCE:
         led.state = Led.PULSE_QUICK  # Thinking.
         mixer.music.load(SOUNDS_PATH+'processing.mp3')
@@ -95,7 +105,7 @@ def process_event(assistant, led, event):
 def main():
     logging.basicConfig(level=logging.INFO)
     mixer.init()
-    mixer.music.set_volume(0.10)
+    mixer.music.set_volume(0.90)
     credentials = auth_helpers.get_assistant_credentials()
     with Board() as board, Assistant(credentials) as assistant:
         for event in assistant.start():
