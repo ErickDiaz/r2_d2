@@ -12,13 +12,13 @@ Configuration via environment variables:
 """
 
 import os
+from contextlib import ExitStack
 
 import sounddevice as sd
 from pygame import mixer
 
-from aiy.board import Board, Led
-
 from home_assistant import HomeAssistantClient
+from led_status import LedStatus
 from r2d2_commands import R2D2LocalCommands
 from smart_home_dispatcher import SmartHomeDispatcher
 from sounds import SoundBoard
@@ -43,14 +43,18 @@ def main():
         SmartHomeDispatcher(HomeAssistantClient.from_env(), HA_COMMANDS_PATH),
     ]
 
-    with Board() as board, sd.InputStream(
-        samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE
-    ) as stream:
+    with ExitStack() as stack:
+        led = LedStatus(stack)
+        stream = stack.enter_context(
+            sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
+        )
 
         def read_chunk(size):
             data, _ = stream.read(size)
             return data.tobytes()
 
+        led.ready()
+        sounds.play('hola')
         print('Escuchando wake word...')
         while True:
             data, _ = stream.read(CHUNK_SIZE)
@@ -59,14 +63,15 @@ def main():
                 continue
 
             print('Wake word detectada:', wakeword)
-            board.led.state = Led.ON
+            led.listening()
             sounds.play('processing')
             text = transcriber.transcribe(read_chunk, CHUNK_SIZE)
-            board.led.state = Led.BEACON_DARK
+            led.thinking()
             print('Comando reconocido:', text)
 
             if not any(dispatcher.dispatch(text) for dispatcher in dispatchers):
                 print('Comando no reconocido:', text)
+            led.ready()
 
 
 if __name__ == '__main__':

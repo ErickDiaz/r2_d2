@@ -14,17 +14,33 @@ voz reproduciendo sonidos icónicos de R2-D2 y ejecutando acciones locales
 
 ## Software
 
-### Requisitos previos
+### Sistema operativo
 
-Pensado para correr sobre la imagen oficial **AIY Projects Raspbian** (o
-Raspberry Pi OS + el script de instalación del Voice Kit), que ya trae
-preinstalados:
+Usamos la imagen oficial **AIY Projects Raspbian** (`aiyprojects-2018-11-16.img.xz`,
+[release en GitHub](https://github.com/google/aiyprojects-raspbian/releases/tag/v20181116)),
+a propósito y no una Raspberry Pi OS moderna: es la única combinación donde el
+sonido, el botón y el LED del HAT funcionan garantizados de fábrica. El LED no
+es solo un indicador de estado — es parte del look de esta réplica de R2-D2
+(parpadea al responder), así que vale más la fricción de un SO viejo que
+arriesgar esa pieza. En Raspberry Pi OS Bookworm/Bullseye el driver del
+LED/botón del bonnet sigue en un estado inestable/experimental según la
+comunidad (ver hilos en el foro de Raspberry Pi sobre "AIY Voice Bonnet").
 
-- El paquete `aiy` (LEDs, botón, pines, TTS) — [aiyprojects-raspbian](https://github.com/google/aiyprojects-raspbian)
-- `google-assistant-library` y las credenciales del Google Assistant
+**Trade-off conocido**: esa imagen es de 2018, basada en Raspbian Stretch con
+**Python 3.5**, que no tiene wheels para `vosk`/`openwakeword`/`numpy`
+modernos. Plan para resolverlo:
 
-Sigue la [guía oficial del Voice Kit](https://aiyprojects.withgoogle.com/voice/)
-para dejar el hardware funcionando y autenticado antes de usar estos scripts.
+1. Instalar `pyenv` y compilar Python 3.11 desde código fuente sobre la
+   imagen (lento en una Pi 3, es un costo único).
+2. Crear un venv con ese Python 3.11 solo para este repo e instalar ahí
+   `requirements.txt`.
+3. El paquete `aiy` (LEDs, botón, `tts.say`) queda bajo el Python 3.5 del
+   sistema. Al ser mayormente Python puro (envuelve `arecord`/`aplay`/
+   `pico2wave` y GPIO/I2C), debería bastar con agregarlo al `PYTHONPATH` del
+   venv nuevo sin recompilar nada — **falta validar esto en hardware real**.
+
+Ya no hace falta registrar credenciales de Google Assistant (ese SDK está
+siendo desmantelado); solo se usa la imagen como base de drivers de hardware.
 
 ### Dependencias Python
 
@@ -153,9 +169,15 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 - **`r2d2_commands.R2D2LocalCommands`** — mapea frases reconocidas a acciones
   locales (apagar, reiniciar, decir IP), con voz (`aiy.voice.tts`) y sonidos
   (`SoundBoard`) de feedback.
+- **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
+  en el LED del HAT; si `aiy.board` no está disponible, no hace nada en vez
+  de romper el resto del pipeline.
 
 ## Roadmap / ideas pendientes
 
+- Validar en hardware real que el paquete `aiy` (Python 3.5 del sistema)
+  funciona agregado al `PYTHONPATH` de un venv con Python 3.11, para poder
+  instalar ahí `vosk`/`openwakeword`/`numpy` modernos.
 - Entrenar una wake word propia en español (hoy usa `hey_jarvis`, en inglés).
 - Reemplazar `pico2wave`/`aiy.voice.tts` por Piper para una voz más natural.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.
