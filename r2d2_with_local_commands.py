@@ -22,7 +22,6 @@ It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
 
 import logging
-import os
 import subprocess
 import sys
 
@@ -37,41 +36,18 @@ from aiy.voice import tts
 from sounds import SoundBoard
 
 
-class SpotRobot:
-    """Controls a remote Spot Micro robot over SSH."""
-
-    def __init__(self, host, user, path):
-        self.host = host
-        self.user = user
-        self.path = path
-
-    @classmethod
-    def from_env(cls):
-        return cls(os.getenv('SPOT_HOST'), os.getenv('SPOT_USER'), os.getenv('SPOT_PATH'))
-
-    def activate(self):
-        """Trigger the robot's initial-position routine. Returns True on success."""
-        result = subprocess.run([
-            'ssh', '%s@%s' % (self.user, self.host),
-            'python3 %s/initial_position.py' % self.path,
-        ])
-        return result.returncode == 0
-
-
 class R2D2Assistant:
     """Wires Google Assistant Library events to R2-D2 sounds, LED state and voice commands."""
 
-    def __init__(self, board, assistant, sounds, spot):
+    def __init__(self, board, assistant, sounds):
         self.board = board
         self.assistant = assistant
         self.sounds = sounds
-        self.spot = spot
         self._commands = {
             'power off': self._power_off,
             'reboot': self._reboot,
             'ip address': self._say_ip,
             'puto': self._say_puto,
-            'activa el spot': self._activate_spot,
         }
         self._events = {
             EventType.ON_START_FINISHED: self._on_start_finished,
@@ -151,17 +127,12 @@ class R2D2Assistant:
     def _say_puto(self):
         tts.say('puto')
 
-    def _activate_spot(self):
-        self.sounds.play('eureka')
-        success = self.spot.activate()
-        self.sounds.play('proud' if success else 'concerned')
-
 
 def main():
     logging.basicConfig(level=logging.INFO)
     credentials = auth_helpers.get_assistant_credentials()
     with Board() as board, Assistant(credentials) as assistant:
-        R2D2Assistant(board, assistant, SoundBoard(mixer), SpotRobot.from_env()).run()
+        R2D2Assistant(board, assistant, SoundBoard(mixer)).run()
 
 
 if __name__ == '__main__':

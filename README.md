@@ -3,7 +3,7 @@
 Asistente de voz para una réplica de R2-D2 impresa en 3D, montada sobre una
 **Raspberry Pi 3** con el **Google AIY Voice Kit 2.0**. Reacciona a comandos de
 voz reproduciendo sonidos icónicos de R2-D2 y ejecutando acciones locales
-(apagar, reiniciar, decir la IP, activar un robot Spot Micro remoto vía SSH).
+(apagar, reiniciar, decir la IP).
 
 ## Hardware
 
@@ -35,19 +35,6 @@ pip3 install -r requirements.txt
 Instala `pygame` (reproducción de sonidos) y `gpiozero` (control de LEDs en
 `r2_lights.py`).
 
-### Variables de entorno
-
-El comando de voz "activa el spot" ejecuta, vía SSH, un script en un robot
-Spot Micro remoto:
-
-```bash
-export SPOT_HOST=<ip-o-hostname-del-spot>
-export SPOT_USER=<usuario-ssh>
-export SPOT_PATH=<ruta-al-proyecto-en-el-spot>
-```
-
-Requiere acceso SSH por clave pública (sin contraseña) hacia ese host.
-
 ## Scripts
 
 | Script | Qué hace |
@@ -72,7 +59,6 @@ interceptan localmente:
 | "power off" | Apaga la Raspberry Pi |
 | "reboot" | Reinicia la Raspberry Pi |
 | "ip address" | Dice la IP local por voz |
-| "activa el spot" | Se conecta por SSH al robot Spot Micro y ejecuta `initial_position.py` |
 
 ## Sonidos de R2-D2
 
@@ -85,14 +71,10 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 
 - **`sounds.SoundBoard`** — carga `sounds_data.csv` y reproduce clips por
   nombre sobre un mixer de `pygame`.
-- **`r2d2_with_local_commands.SpotRobot`** — encapsula la conexión SSH al
-  robot Spot Micro.
 - **`r2d2_with_local_commands.R2D2Assistant`** — despacha eventos del Google
   Assistant (tabla evento → handler) y comandos de voz (tabla frase →
   handler) en vez de una cadena larga de `if/elif`.
 
 ## Roadmap / ideas pendientes
 
-- Mover `SPOT_HOST` / `SPOT_USER` / `SPOT_PATH` a un archivo `.env` en vez de
-  variables de entorno manuales.
 - Agregar más comandos de voz y sonidos.
