@@ -1,2 +1,7 @@
 pygame
 gpiozero
+openwakeword
+vosk
+sounddevice
+numpy
+requests
