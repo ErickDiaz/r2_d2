@@ -22,94 +22,146 @@ It is available for Raspberry Pi 2/3 only; Pi Zero is not supported.
 """
 
 import logging
-import platform
+import os
 import subprocess
 import sys
-import os
+
 from google.assistant.library.event import EventType
+from pygame import mixer
 
 from aiy.assistant import auth_helpers
 from aiy.assistant.library import Assistant
 from aiy.board import Board, Led
 from aiy.voice import tts
 
-from pygame import mixer 
-
-SOUNDS_DATA = None
-SOUNDS_PATH = 'sounds/'
-
-## SPOT ##
-SPOT_HOST=os.getenv('SPOT_HOST')
-SPOT_USER=os.getenv('SPOT_USER')
-SPOT_PATH=os.getenv('SPOT_PATH')
-
-def power_off_pi():
-    tts.say('Good bye!')
-    subprocess.call('sudo shutdown now', shell=True)
+from sounds import SoundBoard
 
 
-def reboot_pi():
-    tts.say('See you in a bit!')
-    subprocess.call('sudo reboot', shell=True)
+class SpotRobot:
+    """Controls a remote Spot Micro robot over SSH."""
+
+    def __init__(self, host, user, path):
+        self.host = host
+        self.user = user
+        self.path = path
+
+    @classmethod
+    def from_env(cls):
+        return cls(os.getenv('SPOT_HOST'), os.getenv('SPOT_USER'), os.getenv('SPOT_PATH'))
+
+    def activate(self):
+        """Trigger the robot's initial-position routine. Returns True on success."""
+        result = subprocess.run([
+            'ssh', '%s@%s' % (self.user, self.host),
+            'python3 %s/initial_position.py' % self.path,
+        ])
+        return result.returncode == 0
 
 
-def say_ip():
-    ip_address = subprocess.check_output("hostname -I | cut -d' ' -f1", shell=True)
-    tts.say('My IP address is %s' % ip_address.decode('utf-8'))
+class R2D2Assistant:
+    """Wires Google Assistant Library events to R2-D2 sounds, LED state and voice commands."""
 
+    def __init__(self, board, assistant, sounds, spot):
+        self.board = board
+        self.assistant = assistant
+        self.sounds = sounds
+        self.spot = spot
+        self._commands = {
+            'power off': self._power_off,
+            'reboot': self._reboot,
+            'ip address': self._say_ip,
+            'puto': self._say_puto,
+            'activa el spot': self._activate_spot,
+        }
+        self._events = {
+            EventType.ON_START_FINISHED: self._on_start_finished,
+            EventType.ON_CONVERSATION_TURN_STARTED: self._on_turn_started,
+            EventType.ON_RECOGNIZING_SPEECH_FINISHED: self._on_speech_recognized,
+            EventType.ON_END_OF_UTTERANCE: self._on_end_of_utterance,
+            EventType.ON_CONVERSATION_TURN_FINISHED: self._on_turn_finished,
+            EventType.ON_CONVERSATION_TURN_TIMEOUT: self._on_turn_finished,
+            EventType.ON_NO_RESPONSE: self._on_turn_finished,
+            EventType.ON_ASSISTANT_ERROR: self._on_assistant_error,
+        }
 
-def process_event(assistant, led, event):
-    logging.info(event)
-    if event.type == EventType.ON_START_FINISHED:
-        led.state = Led.BEACON_DARK  # Ready.
-        mixer.music.load(SOUNDS_PATH+'hola.mp3')
-        mixer.music.play()
+    def run(self):
+        for event in self.assistant.start():
+            self._dispatch(event)
+
+    def _dispatch(self, event):
+        logging.info(event)
+        handler = self._events.get(event.type)
+        if handler:
+            handler(event)
+
+    @property
+    def led(self):
+        return self.board.led
+
+    # -- event handlers --------------------------------------------------
+
+    def _on_start_finished(self, event):
+        self.led.state = Led.BEACON_DARK  # Ready.
+        self.sounds.play('hola')
         print('Say "OK, Google" then speak, or press Ctrl+C to quit...')
-    elif event.type == EventType.ON_CONVERSATION_TURN_STARTED:
-        led.state = Led.ON  # Listening.
-        #mixer.music.load(SOUNDS_PATH+'eureka.mp3')
-        #mixer.music.play()
-    elif event.type == EventType.ON_RECOGNIZING_SPEECH_FINISHED and event.args:
-        print('You said:', event.args['text'])
-        text = event.args['text'].lower()
-        if text == 'power off':
-            assistant.stop_conversation()
-            power_off_pi()
-        elif text == 'reboot':
-            assistant.stop_conversation()
-            reboot_pi()
-        elif text == 'ip address':
-            assistant.stop_conversation()
-            say_ip()
-        elif text == 'puto':
-            tts.say('puto')
-        elif text == 'activa el spot':
-            mixer.music.load(SOUNDS_PATH+'eureka.mp3')
-            mixer.music.play()
-            ## Excecute command
-            print(SPOT_USER)
-            print(SPOT_HOST)
-            os.system("ssh "+SPOT_USER+"@"+SPOT_HOST+" 'python3 "+SPOT_PATH+"/initial_position.py'")
-    elif event.type == EventType.ON_END_OF_UTTERANCE:
-        led.state = Led.PULSE_QUICK  # Thinking.
-        mixer.music.load(SOUNDS_PATH+'processing.mp3')
-        mixer.music.play()
-    elif (event.type == EventType.ON_CONVERSATION_TURN_FINISHED
-          or event.type == EventType.ON_CONVERSATION_TURN_TIMEOUT
-          or event.type == EventType.ON_NO_RESPONSE):
-        led.state = Led.BEACON_DARK  # Ready.
-    elif event.type == EventType.ON_ASSISTANT_ERROR and event.args and event.args['is_fatal']:
-        sys.exit(1)
+
+    def _on_turn_started(self, event):
+        self.led.state = Led.ON  # Listening.
+
+    def _on_speech_recognized(self, event):
+        if not event.args:
+            return
+        text = event.args['text']
+        print('You said:', text)
+        command = self._commands.get(text.lower())
+        if command:
+            command()
+
+    def _on_end_of_utterance(self, event):
+        self.led.state = Led.PULSE_QUICK  # Thinking.
+        self.sounds.play('processing')
+
+    def _on_turn_finished(self, event):
+        self.led.state = Led.BEACON_DARK  # Ready.
+
+    def _on_assistant_error(self, event):
+        if event.args and event.args['is_fatal']:
+            self.sounds.play('sad', wait=True)
+            sys.exit(1)
+
+    # -- voice commands ---------------------------------------------------
+
+    def _power_off(self):
+        self.assistant.stop_conversation()
+        self.sounds.play('sure')
+        tts.say('Good bye!')
+        subprocess.run(['sudo', 'shutdown', 'now'])
+
+    def _reboot(self):
+        self.assistant.stop_conversation()
+        self.sounds.play('sure')
+        tts.say('See you in a bit!')
+        subprocess.run(['sudo', 'reboot'])
+
+    def _say_ip(self):
+        self.assistant.stop_conversation()
+        ip_address = subprocess.check_output(['hostname', '-I']).decode('utf-8').split()[0]
+        tts.say('My IP address is %s' % ip_address)
+
+    def _say_puto(self):
+        tts.say('puto')
+
+    def _activate_spot(self):
+        self.sounds.play('eureka')
+        success = self.spot.activate()
+        self.sounds.play('proud' if success else 'concerned')
 
 
 def main():
     logging.basicConfig(level=logging.INFO)
-    mixer.init()
-    mixer.music.set_volume(0.90)
     credentials = auth_helpers.get_assistant_credentials()
     with Board() as board, Assistant(credentials) as assistant:
-        for event in assistant.start():
-            process_event(assistant, board.led, event)
+        R2D2Assistant(board, assistant, SoundBoard(mixer), SpotRobot.from_env()).run()
 
 
 if __name__ == '__main__':
