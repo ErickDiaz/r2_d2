@@ -16,51 +16,62 @@ voz reproduciendo sonidos icónicos de R2-D2 y ejecutando acciones locales
 
 ### Sistema operativo
 
-La intención original era usar la imagen oficial **AIY Projects Raspbian**
-(`aiyprojects-2018-11-16.img.xz`) porque es la única combinación donde el
-sonido, el botón y el LED del HAT funcionan garantizados de fábrica (el LED
-no es solo un indicador de estado — es parte del look de esta réplica de
-R2-D2, parpadea al responder). En la práctica, la SD de este build quedó
-flasheada con **Raspberry Pi OS actual (Debian 13 "trixie", Python 3.13)** —
-el default de Raspberry Pi Imager — así que el setup real es distinto al
-plan original:
+Usamos la imagen oficial **AIY Projects Raspbian**
+(`aiyprojects-2018-11-16.img.xz`,
+[release en GitHub](https://github.com/google/aiyprojects-raspbian/releases/tag/v20181116)),
+no una Raspberry Pi OS moderna. Es la única combinación donde el sonido, el
+botón y el LED del HAT funcionan garantizados de fábrica — el LED no es solo
+un indicador de estado, es parte del look de esta réplica de R2-D2 (parpadea
+al responder), así que vale más la fricción de un SO viejo que arriesgar esa
+pieza.
 
-- **Python 3.13**: ventaja inesperada — no hace falta pyenv ni venvs
-  especiales, `vosk`/`openwakeword`/`numpy` instalan con wheels normales.
-- **Micrófono/parlante del HAT**: no aparecen por defecto en `arecord -l`.
-  Hay que agregar el overlay de sonido y reiniciar:
+**Esto no es teórico**: se probó primero con Raspberry Pi OS actual (Debian
+13 "trixie", kernel 6.18) porque así quedó la SD tras un reflasheo con
+Raspberry Pi Imager por defecto. El micrófono/parlante del HAT nunca llegó a
+registrarse como tarjeta ALSA a pesar de que los módulos del kernel
+(`snd_soc_googlevoicehat_codec`, `snd_soc_rpi_simple_soundcard`,
+`snd_soc_bcm2835_i2s`) cargaban sin error — consistente con los reportes de
+la comunidad de que el driver del AIY Bonnet está roto en Bookworm/Trixie.
+De ahí la decisión de volver a la imagen oficial de 2018.
 
-  ```bash
-  echo "dtoverlay=googlevoicehat-soundcard" | sudo tee -a /boot/firmware/config.txt
-  sudo reboot
-  ```
+**Trade-off conocido**: esa imagen es de 2018, basada en Raspbian Stretch con
+**Python 3.5**, que no tiene wheels para `vosk`/`openwakeword`/`numpy`
+modernos. Plan para resolverlo:
 
-- **Paquete `aiy` (LEDs, botón)**: no viene instalado en esta imagen, y su
-  soporte en Raspberry Pi OS Bookworm/Trixie está en un estado
-  inestable/experimental según la comunidad (ver hilos del foro de
-  Raspberry Pi sobre "AIY Voice Bonnet"). Por eso `led_status.LedStatus`
-  degrada a no-op si `aiy.board` no está disponible, y `text_to_speech.say`
-  usa `espeak-ng` como respaldo si `aiy.voice.tts` tampoco está. **Pendiente
-  de decidir**: invertir tiempo en compilar el driver de LED (para no perder
-  esa seña de identidad de R2-D2) o resignarse a correr sin él por ahora.
+1. Instalar `pyenv` y compilar Python 3.11 desde código fuente sobre la
+   imagen (lento en una Pi 3, es un costo único).
+2. Crear un venv con ese Python 3.11 solo para este repo e instalar ahí
+   `requirements.txt`.
+3. El paquete `aiy` (LEDs, botón, `tts.say`) queda bajo el Python 3.5 del
+   sistema. Al ser mayormente Python puro (envuelve `arecord`/`aplay`/
+   `pico2wave` y GPIO/I2C), debería bastar con agregarlo al `PYTHONPATH` del
+   venv nuevo sin recompilar nada — **falta validar esto en hardware real**.
 
 Ya no hace falta registrar credenciales de Google Assistant (ese SDK está
-siendo desmantelado); solo se necesita el driver de sonido del HAT.
+siendo desmantelado); solo se usa la imagen como base de drivers de hardware.
+`led_status.LedStatus` y `text_to_speech.say` igual quedan con su fallback
+(no-op / `espeak-ng`) por si el driver de `aiy` fallara también aquí.
 
 ### Dependencias Python
 
+Con Python 3.5 (el de la imagen AIY) no hay wheels para `vosk`/`openwakeword`/
+`numpy` modernos, así que se instalan dentro del venv de Python 3.11 hecho
+con `pyenv` (ver arriba), no con el `pip3` del sistema:
+
 ```bash
-pip3 install -r requirements.txt
+~/.pyenv/versions/3.11.*/bin/python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
-Instala `pygame` (reproducción de sonidos), `gpiozero` (control de LEDs en
-`r2_lights.py`), `openwakeword` + `vosk` + `sounddevice` + `numpy` (voz
-local, ver más abajo) y `requests` (llamadas a Home Assistant). A nivel de
-sistema hace falta PortAudio (para `sounddevice`) y `espeak-ng` (respaldo de
-TTS si `aiy.voice.tts` no está disponible):
+Instala `pygame` (reproducción de sonidos), `gpiozero`, `openwakeword` +
+`vosk` + `sounddevice` + `numpy` (voz local, ver más abajo) y `requests`
+(llamadas a Home Assistant). A nivel de sistema hace falta PortAudio (para
+`sounddevice`) y `espeak-ng` (respaldo de TTS si `aiy.voice.tts` no está
+disponible):
 
 ```bash
-sudo apt install python3-venv python3-full libportaudio2 portaudio19-dev espeak-ng
+sudo apt install libportaudio2 portaudio19-dev espeak-ng
 ```
 
 ## Scripts
@@ -183,9 +194,8 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 
 ## Roadmap / ideas pendientes
 
-- Decidir si vale la pena compilar/instalar el driver de LED/botón del AIY
-  HAT en Raspberry Pi OS actual (hoy corre sin él, vía `LedStatus`), o vivir
-  sin esa seña visual de R2-D2.
+- Validar en hardware real que el paquete `aiy` (Python 3.5 del sistema)
+  funciona agregado al `PYTHONPATH` de un venv con Python 3.11.
 - Entrenar una wake word propia en español (hoy usa `hey_jarvis`, en inglés).
-- Reemplazar `espeak-ng`/`pico2wave` por Piper para una voz más natural.
+- Reemplazar `pico2wave`/`aiy.voice.tts` por Piper para una voz más natural.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.
