@@ -156,6 +156,10 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 
 - **`sounds.SoundBoard`** — carga `sounds_data.csv` y reproduce clips por
   nombre sobre un mixer de `pygame`.
+- **`text_normalize.normalize`** — quita mayúsculas y tildes antes de
+  comparar frases reconocidas contra los comandos configurados (usado por
+  `wakeword`, `r2d2_commands` y `smart_home_dispatcher`); sin esto, "cuál"
+  transcrito por Vosk no matchea contra una clave escrita como "cual".
 - **`wakeword.VoskWakeWordDetector`** — detecta una frase de activación
   usando un `KaldiRecognizer` de Vosk restringido por gramática (liviano,
   sin librería de wake-word aparte).

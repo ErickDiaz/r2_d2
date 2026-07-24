@@ -6,12 +6,14 @@ import json
 
 import vosk
 
+from text_normalize import normalize
+
 
 class VoskWakeWordDetector:
     """Detects a fixed wake phrase using a grammar-restricted Vosk recognizer."""
 
     def __init__(self, model, wake_phrase, sample_rate=16000):
-        self._wake_phrase = wake_phrase
+        self._wake_phrase = normalize(wake_phrase)
         grammar = json.dumps([wake_phrase, '[unk]'])
         self._recognizer = vosk.KaldiRecognizer(model, sample_rate, grammar)
 
@@ -21,7 +23,7 @@ class VoskWakeWordDetector:
             text = json.loads(self._recognizer.Result()).get('text', '')
         else:
             text = json.loads(self._recognizer.PartialResult()).get('partial', '')
-        if self._wake_phrase in text:
+        if self._wake_phrase in normalize(text):
             self._recognizer.Reset()
             return True
         return False

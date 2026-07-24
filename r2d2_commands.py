@@ -6,6 +6,7 @@ which prefers aiy.voice.tts but falls back to espeak-ng.
 import subprocess
 
 import text_to_speech
+from text_normalize import normalize
 
 
 class R2D2LocalCommands:
@@ -14,15 +15,15 @@ class R2D2LocalCommands:
     def __init__(self, sounds):
         self._sounds = sounds
         self._commands = {
-            'apaga la pi': self._power_off,
-            'reinicia la pi': self._reboot,
-            'cual es tu direccion': self._say_ip,
-            'dime tu direccion': self._say_ip,
+            normalize('apaga la pi'): self._power_off,
+            normalize('reinicia la pi'): self._reboot,
+            normalize('cual es tu direccion'): self._say_ip,
+            normalize('dime tu direccion'): self._say_ip,
         }
 
     def dispatch(self, text):
-        """Run the action mapped to `text` (case-insensitive). Returns True if handled."""
-        command = self._commands.get(text.strip().lower())
+        """Run the action mapped to `text` (case/accent-insensitive). Returns True if handled."""
+        command = self._commands.get(normalize(text))
         if not command:
             return False
         command()
