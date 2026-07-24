@@ -1,6 +1,5 @@
 pygame
 gpiozero
-pvporcupine
 vosk
 sounddevice
 numpy

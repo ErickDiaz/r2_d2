@@ -8,10 +8,10 @@ vosk.SetLogLevel(-1)
 
 
 class VoskTranscriber:
-    """Transcribes a single spoken command from an offline Vosk model."""
+    """Transcribes a single spoken command using a shared Vosk model."""
 
-    def __init__(self, model_path, sample_rate=16000):
-        self._recognizer = vosk.KaldiRecognizer(vosk.Model(model_path), sample_rate)
+    def __init__(self, model, sample_rate=16000):
+        self._recognizer = vosk.KaldiRecognizer(model, sample_rate)
         self._sample_rate = sample_rate
 
     def transcribe(self, read_chunk, chunk_size, max_seconds=8):

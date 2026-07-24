@@ -59,20 +59,22 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Instala `pygame` (sonidos), `gpiozero`, `pvporcupine` (wake word),  `vosk`
-(reconocimiento de voz), `sounddevice` + `numpy` (captura de audio) y
-`requests` (Home Assistant). A nivel de sistema hace falta PortAudio y
-`espeak-ng` (respaldo de TTS):
+Instala `pygame` (sonidos), `gpiozero`, `vosk` (reconocimiento de voz y wake
+word), `sounddevice` + `numpy` (captura de audio) y `requests` (Home
+Assistant). A nivel de sistema hace falta PortAudio, `espeak-ng` (respaldo de
+TTS) y las librerías de SDL2 (para `pygame`):
 
 ```bash
-sudo apt install libportaudio2 portaudio19-dev espeak-ng
+sudo apt install libportaudio2 portaudio19-dev espeak-ng \
+    libsdl2-2.0-0 libsdl2-mixer-2.0-0 libsdl2-image-2.0-0 libsdl2-ttf-2.0-0 \
+    libopenblas0
 ```
 
 ## Scripts
 
 | Script | Qué hace |
 |---|---|
-| `voice_assistant.py` | Front-end de voz local (sin Google): espera una wake word con `Porcupine` y transcribe el comando con `Vosk`, offline. |
+| `voice_assistant.py` | Front-end de voz local (sin Google): espera una wake word y transcribe el comando, ambos con `Vosk`, offline. |
 | `r2d2_with_local_commands.py` | Script original con Google Assistant Library (deprecada desde 2019) — legado, pensado para el HAT que ya no usamos. |
 | `r2d2.py` | Demo de referencia de Google usando la API gRPC del Assistant (legado). |
 | `r2_lights.py` | Prueba de hardware: parpadea dos LEDs por GPIO (pines A/B del HAT). |
@@ -80,26 +82,28 @@ sudo apt install libportaudio2 portaudio19-dev espeak-ng
 ### Reconocimiento de voz local (sin Google) + control de Home Assistant
 
 `voice_assistant.py` es un pipeline 100% local y offline: micrófono USB →
-`WakeWordDetector` (Porcupine) → `VoskTranscriber` (Vosk) →
-`R2D2LocalCommands` (apagar/reiniciar/IP) → `SmartHomeDispatcher` (Home
-Assistant).
+`VoskWakeWordDetector` (Vosk, gramática restringida) → `VoskTranscriber`
+(Vosk, vocabulario abierto) → `R2D2LocalCommands` (apagar/reiniciar/IP) →
+`SmartHomeDispatcher` (Home Assistant). Ambos detectores comparten el mismo
+`vosk.Model` cargado una sola vez.
+
+> **Nota**: se evaluaron `openWakeWord` (bloqueado por su dependencia dura de
+> `onnxruntime`, sin wheels para ARM de 32 bits) y `Porcupine`/Picovoice
+> (bloqueado porque Picovoice pasó a ser una empresa puramente B2B — su
+> consola ya no acepta registros de desarrolladores individuales, solo
+> "company email"). Reusar Vosk evita ambos problemas.
 
 Antes de correrlo hace falta:
 
-1. **Access key de Picovoice** (wake word): crear una cuenta gratuita en
-   [console.picovoice.ai](https://console.picovoice.ai/), copiar el
-   `AccessKey` y exportarlo como `PICOVOICE_ACCESS_KEY`. Por defecto usa la
-   palabra clave incorporada `jarvis` (`WAKEWORD_KEYWORDS`); entrenar una
-   wake word propia en español requiere el Porcupine Console.
-2. **Modelo de Vosk** (STT en español): descargar `vosk-model-small-es-0.42`
+1. **Modelo de Vosk** (STT en español): descargar `vosk-model-small-es-0.42`
    desde [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models),
    descomprimirlo, y apuntar `VOSK_MODEL_PATH` a esa carpeta. No se incluye
    en el repo por su tamaño.
-3. **Token de Home Assistant**: crear un *Long-Lived Access Token* en
+2. **Token de Home Assistant**: crear un *Long-Lived Access Token* en
    Home Assistant (Perfil → Seguridad → Tokens de acceso de larga duración) y
    exportarlo como `HA_TOKEN`, junto con `HA_URL` (la URL base de tu
    instancia, p. ej. `http://homeassistant.local:8123`).
-4. **Mapeo de comandos**: editar `smart_home_commands.json` con tus propias
+3. **Mapeo de comandos**: editar `smart_home_commands.json` con tus propias
    frases y `entity_id` (los del archivo son solo ejemplo). Cada entrada
    tiene la forma:
 
@@ -112,17 +116,17 @@ Antes de correrlo hace falta:
    claves se mandan tal cual como datos del servicio.
 
 ```bash
-export PICOVOICE_ACCESS_KEY=<tu-access-key>
 export VOSK_MODEL_PATH=/ruta/a/vosk-model-small-es-0.42
 export HA_URL=http://homeassistant.local:8123
 export HA_TOKEN=<tu-long-lived-token>
 python3 voice_assistant.py
 ```
 
-Variables de entorno opcionales: `WAKEWORD_KEYWORDS` (lista separada por
-comas, default `jarvis`) y `HA_COMMANDS_PATH` (default
-`smart_home_commands.json`). Si no seteas `HA_URL`/`HA_TOKEN`, el asistente
-corre igual, solo sin el dispatcher de Home Assistant.
+Variables de entorno opcionales: `WAKE_PHRASE` (default `"oye r2 d2"` — debe
+ser una frase que Vosk realmente transcriba así; probar y ajustar) y
+`HA_COMMANDS_PATH` (default `smart_home_commands.json`). Si no seteas
+`HA_URL`/`HA_TOKEN`, el asistente corre igual, solo sin el dispatcher de
+Home Assistant.
 
 Frases reconocidas por `R2D2LocalCommands`:
 
@@ -147,10 +151,12 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 
 - **`sounds.SoundBoard`** — carga `sounds_data.csv` y reproduce clips por
   nombre sobre un mixer de `pygame`.
-- **`wakeword.WakeWordDetector`** — detecta una wake word de Porcupine a
-  partir de frames de audio.
+- **`wakeword.VoskWakeWordDetector`** — detecta una frase de activación
+  usando un `KaldiRecognizer` de Vosk restringido por gramática (liviano,
+  sin librería de wake-word aparte).
 - **`speech_to_text.VoskTranscriber`** — transcribe un comando hablado con
-  Vosk, offline.
+  Vosk en vocabulario abierto, offline. Comparte el `vosk.Model` con el
+  detector de wake word.
 - **`home_assistant.HomeAssistantClient`** — llama servicios de Home
   Assistant vía su API REST.
 - **`smart_home_dispatcher.SmartHomeDispatcher`** — mapea frases reconocidas
@@ -170,10 +176,10 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 ## Roadmap / ideas pendientes
 
 - Resolver el parlante (USB o mini-amp al jack 3.5mm).
-- Retomar el LED/botón del HAT — sin drivers en Bullseye moderno; evaluar si
-  vale la pena portar el driver o controlar el LED directo por GPIO/I2C.
-- Entrenar una wake word propia en español en Porcupine Console (hoy usa
-  `jarvis`, en inglés).
+- Retomar el LED/botón del HAT — sin drivers en Bullseye; evaluar si vale la
+  pena portar el driver o controlar el LED directo por GPIO/I2C.
+- Afinar `WAKE_PHRASE` según lo que Vosk realmente transcriba (probar en
+  hardware real: tasa de falsos positivos/negativos).
 - Reemplazar `pico2wave`/`aiy.voice.tts`/`espeak-ng` por Piper para una voz
   más natural.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.

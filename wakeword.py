@@ -1,24 +1,27 @@
-"""Local wake-word detection using Picovoice Porcupine."""
+"""Wake-word detection reusing Vosk's grammar-restricted recognition mode
+instead of a separate wake-word library.
+"""
 
-import pvporcupine
+import json
+
+import vosk
 
 
-class WakeWordDetector:
-    """Detects a built-in Porcupine wake word from a stream of 16kHz mono int16 audio frames."""
+class VoskWakeWordDetector:
+    """Detects a fixed wake phrase using a grammar-restricted Vosk recognizer."""
 
-    def __init__(self, access_key, keywords):
-        self._keywords = list(keywords)
-        self._porcupine = pvporcupine.create(access_key=access_key, keywords=self._keywords)
+    def __init__(self, model, wake_phrase, sample_rate=16000):
+        self._wake_phrase = wake_phrase
+        grammar = json.dumps([wake_phrase, '[unk]'])
+        self._recognizer = vosk.KaldiRecognizer(model, sample_rate, grammar)
 
-    @property
-    def sample_rate(self):
-        return self._porcupine.sample_rate
-
-    @property
-    def frame_length(self):
-        return self._porcupine.frame_length
-
-    def detect(self, frame):
-        """Feed one audio frame (length == frame_length). Returns the matched keyword, or None."""
-        index = self._porcupine.process(frame)
-        return self._keywords[index] if index >= 0 else None
+    def detect(self, chunk):
+        """Feed one chunk of raw int16 PCM bytes. Returns True once the wake phrase is heard."""
+        if self._recognizer.AcceptWaveform(chunk):
+            text = json.loads(self._recognizer.Result()).get('text', '')
+        else:
+            text = json.loads(self._recognizer.PartialResult()).get('partial', '')
+        if self._wake_phrase in text:
+            self._recognizer.Reset()
+            return True
+        return False
