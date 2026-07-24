@@ -1,11 +1,11 @@
 """Local R2-D2 system commands (power off, reboot, say IP), with voice/sound
-feedback. Independent of any cloud assistant -- uses aiy.voice.tts, which
-synthesizes speech locally via pico2wave.
+feedback. Independent of any cloud assistant -- speech uses text_to_speech,
+which prefers aiy.voice.tts but falls back to espeak-ng.
 """
 
 import subprocess
 
-from aiy.voice import tts
+import text_to_speech
 
 
 class R2D2LocalCommands:
@@ -30,14 +30,14 @@ class R2D2LocalCommands:
 
     def _power_off(self):
         self._sounds.play('sure')
-        tts.say('Adios!', lang='es-ES')
+        text_to_speech.say('Adios!')
         subprocess.run(['sudo', 'shutdown', 'now'])
 
     def _reboot(self):
         self._sounds.play('sure')
-        tts.say('Nos vemos en un momento!', lang='es-ES')
+        text_to_speech.say('Nos vemos en un momento!')
         subprocess.run(['sudo', 'reboot'])
 
     def _say_ip(self):
         ip_address = subprocess.check_output(['hostname', '-I']).decode('utf-8').split()[0]
-        tts.say('Mi direccion IP es %s' % ip_address, lang='es-ES')
+        text_to_speech.say('Mi direccion IP es %s' % ip_address)

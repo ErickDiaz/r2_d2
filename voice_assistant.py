@@ -38,10 +38,11 @@ def main():
     detector = WakeWordDetector(WAKEWORD_MODELS, threshold=WAKEWORD_THRESHOLD, chunk_size=CHUNK_SIZE)
     transcriber = VoskTranscriber(VOSK_MODEL_PATH, sample_rate=SAMPLE_RATE)
     sounds = SoundBoard(mixer)
-    dispatchers = [
-        R2D2LocalCommands(sounds),
-        SmartHomeDispatcher(HomeAssistantClient.from_env(), HA_COMMANDS_PATH),
-    ]
+    dispatchers = [R2D2LocalCommands(sounds)]
+    if os.getenv('HA_URL') and os.getenv('HA_TOKEN'):
+        dispatchers.append(SmartHomeDispatcher(HomeAssistantClient.from_env(), HA_COMMANDS_PATH))
+    else:
+        print('HA_URL/HA_TOKEN no configurados: el dispatcher de Home Assistant esta deshabilitado')
 
     with ExitStack() as stack:
         led = LedStatus(stack)
