@@ -63,7 +63,9 @@ def main():
 
             print('Wake word detectada')
             led.listening()
-            sounds.play('processing')
+            # wait=True: don't start listening for the command until the R2-D2
+            # sound effect finishes, or the mic picks up its own speaker output.
+            sounds.play('processing', wait=True)
             text = transcriber.transcribe(read_chunk, CHUNK_SIZE)
             led.thinking()
             print('Comando reconocido:', text)
