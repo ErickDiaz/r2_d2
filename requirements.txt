@@ -1,6 +1,6 @@
 pygame
 gpiozero
-openwakeword
+pvporcupine
 vosk
 sounddevice
 numpy

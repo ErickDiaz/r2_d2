@@ -1,74 +1,68 @@
 # R2-D2 con Google AIY Voice Kit 2.0
 
 Asistente de voz para una réplica de R2-D2 impresa en 3D, montada sobre una
-**Raspberry Pi 3** con el **Google AIY Voice Kit 2.0**. Reacciona a comandos de
-voz reproduciendo sonidos icónicos de R2-D2 y ejecutando acciones locales
-(apagar, reiniciar, decir la IP).
+**Raspberry Pi 3**. Reacciona a comandos de voz reproduciendo sonidos
+icónicos de R2-D2, ejecutando acciones locales (apagar, reiniciar, decir la
+IP) y controlando dispositivos de Home Assistant.
 
 ## Hardware
 
-- Raspberry Pi 3 (Model B/B+). El Voice Kit / Google Assistant Library no
-  soporta Pi Zero.
-- Google AIY Voice Kit 2.0 (micrófono, botón, LEDs, altavoz).
+- Raspberry Pi 3 (Model B/B+).
 - Carcasa de R2-D2 impresa en 3D: [tutorial](http://www.uswaterrockets.com/3D_Printing/3D_Printed_Star_Wars_Droid/tutorial.htm).
+- **Micrófono**: USB (probado con un Razer Seiren Mini). El micrófono
+  integrado del Google AIY Voice Kit 2.0 (HAT/Bonnet) se abandonó — ver
+  "Por qué no usamos el HAT" abajo.
+- **Parlante**: pendiente de resolver. El altavoz original del kit está
+  cableado al conector propietario del HAT, no al jack de audífonos de la
+  Pi; hace falta un parlante USB o un mini amplificador para el jack 3.5mm.
+- **LED/botón del HAT**: pendiente por separado (no es solo estético — el
+  LED rojo parpadeante es parte del look de este R2-D2). `led_status.LedStatus`
+  ya está preparado para usarlo si se resuelve más adelante, pero hoy corre
+  sin él.
+
+### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
+
+Se probó exhaustivamente en hardware real: **Raspberry Pi OS Bullseye,
+Bookworm y Trixie fallan de forma idéntica** — los módulos del kernel del
+HAT (`snd_soc_googlevoicehat_codec`, `snd_soc_rpi_simple_soundcard`,
+`snd_soc_bcm2835_i2s`) cargan sin error, pero la tarjeta de sonido ALSA
+nunca se registra. Solo la imagen oficial `aiyprojects-2018-11-16.img.xz`
+(Raspbian 9 "stretch") tiene el audio del HAT funcionando de fábrica — pero
+su glibc (2.24) es demasiado viejo para `vosk` y otros paquetes modernos con
+código compilado (confirmado: `vosk` instala pero falla al importar con
+`GLIBC_2.27' not found`). No hay ninguna imagen que dé ambas cosas a la vez,
+así que se optó por abandonar el audio del HAT y usar un micrófono USB
+genérico + Raspberry Pi OS Bullseye (glibc 2.31, Python 3.9, buen soporte de
+paquetes).
 
 ## Software
 
 ### Sistema operativo
 
-Usamos la imagen oficial **AIY Projects Raspbian**
-(`aiyprojects-2018-11-16.img.xz`,
-[release en GitHub](https://github.com/google/aiyprojects-raspbian/releases/tag/v20181116)),
-no una Raspberry Pi OS moderna. Es la única combinación donde el sonido, el
-botón y el LED del HAT funcionan garantizados de fábrica — el LED no es solo
-un indicador de estado, es parte del look de esta réplica de R2-D2 (parpadea
-al responder), así que vale más la fricción de un SO viejo que arriesgar esa
-pieza.
+**Raspberry Pi OS Bullseye (Legacy, 32-bit)**. No viene en el catálogo
+normal de Raspberry Pi Imager (que ahora ofrece Bookworm/Trixie) — hay que
+descargar la imagen del archivo oficial:
 
-**Esto no es teórico**: se probó primero con Raspberry Pi OS actual (Debian
-13 "trixie", kernel 6.18) porque así quedó la SD tras un reflasheo con
-Raspberry Pi Imager por defecto. El micrófono/parlante del HAT nunca llegó a
-registrarse como tarjeta ALSA a pesar de que los módulos del kernel
-(`snd_soc_googlevoicehat_codec`, `snd_soc_rpi_simple_soundcard`,
-`snd_soc_bcm2835_i2s`) cargaban sin error — consistente con los reportes de
-la comunidad de que el driver del AIY Bonnet está roto en Bookworm/Trixie.
-De ahí la decisión de volver a la imagen oficial de 2018.
+```
+https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2023-05-03/2023-05-03-raspios-bullseye-armhf-lite.img.xz
+```
 
-**Trade-off conocido**: esa imagen es de 2018, basada en Raspbian Stretch con
-**Python 3.5**, que no tiene wheels para `vosk`/`openwakeword`/`numpy`
-modernos. Plan para resolverlo:
-
-1. Instalar `pyenv` y compilar Python 3.11 desde código fuente sobre la
-   imagen (lento en una Pi 3, es un costo único).
-2. Crear un venv con ese Python 3.11 solo para este repo e instalar ahí
-   `requirements.txt`.
-3. El paquete `aiy` (LEDs, botón, `tts.say`) queda bajo el Python 3.5 del
-   sistema. Al ser mayormente Python puro (envuelve `arecord`/`aplay`/
-   `pico2wave` y GPIO/I2C), debería bastar con agregarlo al `PYTHONPATH` del
-   venv nuevo sin recompilar nada — **falta validar esto en hardware real**.
-
-Ya no hace falta registrar credenciales de Google Assistant (ese SDK está
-siendo desmantelado); solo se usa la imagen como base de drivers de hardware.
-`led_status.LedStatus` y `text_to_speech.say` igual quedan con su fallback
-(no-op / `espeak-ng`) por si el driver de `aiy` fallara también aquí.
+Al ser una imagen "custom" en Imager, el asistente de personalización
+(usuario/wifi/SSH) puede no aplicarse — si no, monta la partición `boot` y
+crea un archivo vacío llamado `ssh` para habilitarlo en el primer arranque.
 
 ### Dependencias Python
 
-Con Python 3.5 (el de la imagen AIY) no hay wheels para `vosk`/`openwakeword`/
-`numpy` modernos, así que se instalan dentro del venv de Python 3.11 hecho
-con `pyenv` (ver arriba), no con el `pip3` del sistema:
-
 ```bash
-~/.pyenv/versions/3.11.*/bin/python3 -m venv venv
+python3 -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Instala `pygame` (reproducción de sonidos), `gpiozero`, `openwakeword` +
-`vosk` + `sounddevice` + `numpy` (voz local, ver más abajo) y `requests`
-(llamadas a Home Assistant). A nivel de sistema hace falta PortAudio (para
-`sounddevice`) y `espeak-ng` (respaldo de TTS si `aiy.voice.tts` no está
-disponible):
+Instala `pygame` (sonidos), `gpiozero`, `pvporcupine` (wake word),  `vosk`
+(reconocimiento de voz), `sounddevice` + `numpy` (captura de audio) y
+`requests` (Home Assistant). A nivel de sistema hace falta PortAudio y
+`espeak-ng` (respaldo de TTS):
 
 ```bash
 sudo apt install libportaudio2 portaudio19-dev espeak-ng
@@ -78,39 +72,36 @@ sudo apt install libportaudio2 portaudio19-dev espeak-ng
 
 | Script | Qué hace |
 |---|---|
-| `voice_assistant.py` | Front-end de voz local (sin Google): espera una wake word con `openWakeWord` y transcribe el comando con `Vosk`, offline. |
-| `r2d2_with_local_commands.py` | Script principal original. Usa la Google Assistant Library (deprecada desde 2019), reacciona a eventos de conversación con sonidos/LEDs y añade comandos de voz locales. |
-| `r2d2.py` | Demo de referencia de Google usando la API gRPC del Assistant (legado; sin comandos locales ni sonidos). |
-| `r2_lights.py` | Prueba de hardware: parpadea los dos LEDs del HAT (pines A y B). |
+| `voice_assistant.py` | Front-end de voz local (sin Google): espera una wake word con `Porcupine` y transcribe el comando con `Vosk`, offline. |
+| `r2d2_with_local_commands.py` | Script original con Google Assistant Library (deprecada desde 2019) — legado, pensado para el HAT que ya no usamos. |
+| `r2d2.py` | Demo de referencia de Google usando la API gRPC del Assistant (legado). |
+| `r2_lights.py` | Prueba de hardware: parpadea dos LEDs por GPIO (pines A/B del HAT). |
 
 ### Reconocimiento de voz local (sin Google) + control de Home Assistant
 
-Google está desmantelando el Assistant SDK que usaba `r2d2_with_local_commands.py`,
-así que `voice_assistant.py` reemplaza esa pieza por un pipeline 100% local y
-offline: micrófono → `WakeWordDetector` (openWakeWord) → `VoskTranscriber`
-(Vosk) → `R2D2LocalCommands` (apagar/reiniciar/IP) → `SmartHomeDispatcher`
-(Home Assistant). El HAT del AIY Voice Kit sigue sirviendo igual: el
-micrófono se usa como cualquier dispositivo ALSA/PortAudio, el botón/LEDs
-vía `aiy.board.Board`, y la voz de salida sigue usando `aiy.voice.tts`
-(pico2wave local, sin depender de Google Cloud).
+`voice_assistant.py` es un pipeline 100% local y offline: micrófono USB →
+`WakeWordDetector` (Porcupine) → `VoskTranscriber` (Vosk) →
+`R2D2LocalCommands` (apagar/reiniciar/IP) → `SmartHomeDispatcher` (Home
+Assistant).
 
 Antes de correrlo hace falta:
 
-1. **Modelo de Vosk** (STT en español): descargar `vosk-model-small-es-0.42`
+1. **Access key de Picovoice** (wake word): crear una cuenta gratuita en
+   [console.picovoice.ai](https://console.picovoice.ai/), copiar el
+   `AccessKey` y exportarlo como `PICOVOICE_ACCESS_KEY`. Por defecto usa la
+   palabra clave incorporada `jarvis` (`WAKEWORD_KEYWORDS`); entrenar una
+   wake word propia en español requiere el Porcupine Console.
+2. **Modelo de Vosk** (STT en español): descargar `vosk-model-small-es-0.42`
    desde [alphacephei.com/vosk/models](https://alphacephei.com/vosk/models),
-   descomprimirlo, y apuntar `VOSK_MODEL_PATH` a esa carpeta. No se incluye en
-   el repo por su tamaño.
-2. **Modelo(s) de wake word**: por defecto usa `hey_jarvis` (uno de los
-   modelos en inglés que trae openWakeWord). Para una wake word propia en
-   español (p. ej. "oye R2D2") hay que entrenar un modelo custom siguiendo la
-   [documentación de openWakeWord](https://github.com/dscripka/openWakeWord).
+   descomprimirlo, y apuntar `VOSK_MODEL_PATH` a esa carpeta. No se incluye
+   en el repo por su tamaño.
 3. **Token de Home Assistant**: crear un *Long-Lived Access Token* en
    Home Assistant (Perfil → Seguridad → Tokens de acceso de larga duración) y
-   exportarlo como `HA_TOKEN`, junto con `HA_URL` (la URL base de tu instancia,
-   p. ej. `http://homeassistant.local:8123`).
+   exportarlo como `HA_TOKEN`, junto con `HA_URL` (la URL base de tu
+   instancia, p. ej. `http://homeassistant.local:8123`).
 4. **Mapeo de comandos**: editar `smart_home_commands.json` con tus propias
-   frases y `entity_id` (los del archivo son solo ejemplo). Cada entrada tiene
-   la forma:
+   frases y `entity_id` (los del archivo son solo ejemplo). Cada entrada
+   tiene la forma:
 
    ```json
    "enciende la sala": {"domain": "light", "service": "turn_on", "entity_id": "light.sala"}
@@ -121,18 +112,19 @@ Antes de correrlo hace falta:
    claves se mandan tal cual como datos del servicio.
 
 ```bash
+export PICOVOICE_ACCESS_KEY=<tu-access-key>
 export VOSK_MODEL_PATH=/ruta/a/vosk-model-small-es-0.42
 export HA_URL=http://homeassistant.local:8123
 export HA_TOKEN=<tu-long-lived-token>
 python3 voice_assistant.py
 ```
 
-Variables de entorno opcionales: `WAKEWORD_MODELS` (lista separada por
-comas, default `hey_jarvis`), `WAKEWORD_THRESHOLD` (default `0.5`) y
-`HA_COMMANDS_PATH` (default `smart_home_commands.json`).
+Variables de entorno opcionales: `WAKEWORD_KEYWORDS` (lista separada por
+comas, default `jarvis`) y `HA_COMMANDS_PATH` (default
+`smart_home_commands.json`). Si no seteas `HA_URL`/`HA_TOKEN`, el asistente
+corre igual, solo sin el dispatcher de Home Assistant.
 
-Frases reconocidas por `R2D2LocalCommands` (independiente de
-`r2d2_with_local_commands.py`, que sigue atado a la Google Assistant Library):
+Frases reconocidas por `R2D2LocalCommands`:
 
 | Frase | Acción |
 |---|---|
@@ -143,23 +135,6 @@ Frases reconocidas por `R2D2LocalCommands` (independiente de
 Si `Vosk` transcribe tus frases distinto (con o sin tildes, otro orden de
 palabras), ajusta las claves de `R2D2LocalCommands._commands` en
 `r2d2_commands.py` para que calcen exactamente.
-
-### Ejecutar el asistente principal
-
-```bash
-python3 r2d2_with_local_commands.py
-```
-
-### Comandos de voz locales
-
-Además de conversar normalmente con el Google Assistant, estas frases se
-interceptan localmente:
-
-| Frase | Acción |
-|---|---|
-| "power off" | Apaga la Raspberry Pi |
-| "reboot" | Reinicia la Raspberry Pi |
-| "ip address" | Dice la IP local por voz |
 
 ## Sonidos de R2-D2
 
@@ -172,11 +147,8 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 
 - **`sounds.SoundBoard`** — carga `sounds_data.csv` y reproduce clips por
   nombre sobre un mixer de `pygame`.
-- **`r2d2_with_local_commands.R2D2Assistant`** — despacha eventos del Google
-  Assistant (tabla evento → handler) y comandos de voz (tabla frase →
-  handler) en vez de una cadena larga de `if/elif`.
-- **`wakeword.WakeWordDetector`** — detecta una wake word a partir de chunks
-  de audio, usando openWakeWord.
+- **`wakeword.WakeWordDetector`** — detecta una wake word de Porcupine a
+  partir de frames de audio.
 - **`speech_to_text.VoskTranscriber`** — transcribe un comando hablado con
   Vosk, offline.
 - **`home_assistant.HomeAssistantClient`** — llama servicios de Home
@@ -191,11 +163,17 @@ mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
 - **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
   en el LED del HAT; si `aiy.board` no está disponible, no hace nada en vez
   de romper el resto del pipeline.
+- **`r2d2_with_local_commands.R2D2Assistant`** — (legado, Google Assistant)
+  despacha eventos (tabla evento → handler) y comandos de voz (tabla frase →
+  handler) en vez de una cadena larga de `if/elif`.
 
 ## Roadmap / ideas pendientes
 
-- Validar en hardware real que el paquete `aiy` (Python 3.5 del sistema)
-  funciona agregado al `PYTHONPATH` de un venv con Python 3.11.
-- Entrenar una wake word propia en español (hoy usa `hey_jarvis`, en inglés).
-- Reemplazar `pico2wave`/`aiy.voice.tts` por Piper para una voz más natural.
+- Resolver el parlante (USB o mini-amp al jack 3.5mm).
+- Retomar el LED/botón del HAT — sin drivers en Bullseye moderno; evaluar si
+  vale la pena portar el driver o controlar el LED directo por GPIO/I2C.
+- Entrenar una wake word propia en español en Porcupine Console (hoy usa
+  `jarvis`, en inglés).
+- Reemplazar `pico2wave`/`aiy.voice.tts`/`espeak-ng` por Piper para una voz
+  más natural.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.

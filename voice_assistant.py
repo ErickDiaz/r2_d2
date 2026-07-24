@@ -3,12 +3,12 @@ command that follows, and dispatches it to R2-D2's local commands or to
 Home Assistant.
 
 Configuration via environment variables:
-  WAKEWORD_MODELS     comma-separated openWakeWord model names (default: hey_jarvis)
-  WAKEWORD_THRESHOLD  detection threshold, 0-1 (default: 0.5)
-  VOSK_MODEL_PATH     path to an unzipped Vosk model directory (required)
-  HA_URL              Home Assistant base URL, e.g. http://homeassistant.local:8123
-  HA_TOKEN            Home Assistant long-lived access token
-  HA_COMMANDS_PATH    path to the phrase -> service JSON config (default: smart_home_commands.json)
+  PICOVOICE_ACCESS_KEY  Picovoice Porcupine access key (required, free at console.picovoice.ai)
+  WAKEWORD_KEYWORDS     comma-separated built-in Porcupine keywords (default: jarvis)
+  VOSK_MODEL_PATH       path to an unzipped Vosk model directory (required)
+  HA_URL                Home Assistant base URL, e.g. http://homeassistant.local:8123
+  HA_TOKEN              Home Assistant long-lived access token
+  HA_COMMANDS_PATH      path to the phrase -> service JSON config (default: smart_home_commands.json)
 """
 
 import os
@@ -25,18 +25,15 @@ from sounds import SoundBoard
 from speech_to_text import VoskTranscriber
 from wakeword import WakeWordDetector
 
-SAMPLE_RATE = 16000
-CHUNK_SIZE = 1280  # 80ms @ 16kHz, the block size openWakeWord expects
-
-WAKEWORD_MODELS = os.getenv('WAKEWORD_MODELS', 'hey_jarvis').split(',')
-WAKEWORD_THRESHOLD = float(os.getenv('WAKEWORD_THRESHOLD', '0.5'))
+PICOVOICE_ACCESS_KEY = os.environ['PICOVOICE_ACCESS_KEY']
+WAKEWORD_KEYWORDS = os.getenv('WAKEWORD_KEYWORDS', 'jarvis').split(',')
 VOSK_MODEL_PATH = os.environ['VOSK_MODEL_PATH']
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
 
 
 def main():
-    detector = WakeWordDetector(WAKEWORD_MODELS, threshold=WAKEWORD_THRESHOLD, chunk_size=CHUNK_SIZE)
-    transcriber = VoskTranscriber(VOSK_MODEL_PATH, sample_rate=SAMPLE_RATE)
+    detector = WakeWordDetector(PICOVOICE_ACCESS_KEY, WAKEWORD_KEYWORDS)
+    transcriber = VoskTranscriber(VOSK_MODEL_PATH, sample_rate=detector.sample_rate)
     sounds = SoundBoard(mixer)
     dispatchers = [R2D2LocalCommands(sounds)]
     if os.getenv('HA_URL') and os.getenv('HA_TOKEN'):
@@ -47,7 +44,9 @@ def main():
     with ExitStack() as stack:
         led = LedStatus(stack)
         stream = stack.enter_context(
-            sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
+            sd.InputStream(
+                samplerate=detector.sample_rate, channels=1, dtype='int16', blocksize=detector.frame_length
+            )
         )
 
         def read_chunk(size):
@@ -58,7 +57,7 @@ def main():
         sounds.play('hola')
         print('Escuchando wake word...')
         while True:
-            data, _ = stream.read(CHUNK_SIZE)
+            data, _ = stream.read(detector.frame_length)
             wakeword = detector.detect(data[:, 0])
             if not wakeword:
                 continue
@@ -66,7 +65,7 @@ def main():
             print('Wake word detectada:', wakeword)
             led.listening()
             sounds.play('processing')
-            text = transcriber.transcribe(read_chunk, CHUNK_SIZE)
+            text = transcriber.transcribe(read_chunk, detector.frame_length)
             led.thinking()
             print('Comando reconocido:', text)
 

@@ -1,19 +1,24 @@
-"""Local wake-word detection using openWakeWord."""
+"""Local wake-word detection using Picovoice Porcupine."""
 
-from openwakeword.model import Model
+import pvporcupine
 
 
 class WakeWordDetector:
-    """Detects a wake word from a stream of 16kHz mono int16 audio chunks."""
+    """Detects a built-in Porcupine wake word from a stream of 16kHz mono int16 audio frames."""
 
-    def __init__(self, wakeword_models, threshold=0.5, chunk_size=1280):
-        self._model = Model(wakeword_models=wakeword_models)
-        self.threshold = threshold
-        self.chunk_size = chunk_size
+    def __init__(self, access_key, keywords):
+        self._keywords = list(keywords)
+        self._porcupine = pvporcupine.create(access_key=access_key, keywords=self._keywords)
 
-    def detect(self, chunk):
-        """Feed one audio chunk. Returns the name of the triggered model, or None."""
-        for name, score in self._model.predict(chunk).items():
-            if score >= self.threshold:
-                return name
-        return None
+    @property
+    def sample_rate(self):
+        return self._porcupine.sample_rate
+
+    @property
+    def frame_length(self):
+        return self._porcupine.frame_length
+
+    def detect(self, frame):
+        """Feed one audio frame (length == frame_length). Returns the matched keyword, or None."""
+        index = self._porcupine.process(frame)
+        return self._keywords[index] if index >= 0 else None
