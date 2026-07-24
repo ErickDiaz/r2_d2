@@ -122,8 +122,9 @@ export HA_TOKEN=<tu-long-lived-token>
 python3 voice_assistant.py
 ```
 
-Variables de entorno opcionales: `WAKE_PHRASE` (default `"oye r2 d2"` — debe
-ser una frase que Vosk realmente transcriba así; probar y ajustar) y
+Variables de entorno opcionales: `WAKE_PHRASE` (default `"arturito"` — nombre
+en español de R2-D2; confirmado en el vocabulario del modelo de Vosk, a
+diferencia de "r2"/"d2" que el modelo ignora por no ser palabras reales) y
 `HA_COMMANDS_PATH` (default `smart_home_commands.json`). Si no seteas
 `HA_URL`/`HA_TOKEN`, el asistente corre igual, solo sin el dispatcher de
 Home Assistant.

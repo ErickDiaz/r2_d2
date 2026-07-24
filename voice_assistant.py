@@ -4,7 +4,7 @@ Home Assistant.
 
 Configuration via environment variables:
   VOSK_MODEL_PATH   path to an unzipped Vosk model directory (required)
-  WAKE_PHRASE       phrase that triggers listening (default: "oye r2 d2")
+  WAKE_PHRASE       phrase that triggers listening (default: "arturito")
   HA_URL            Home Assistant base URL, e.g. http://homeassistant.local:8123
   HA_TOKEN          Home Assistant long-lived access token
   HA_COMMANDS_PATH  path to the phrase -> service JSON config (default: smart_home_commands.json)
@@ -29,7 +29,7 @@ SAMPLE_RATE = 16000
 CHUNK_SIZE = 4000  # 0.25s @ 16kHz
 
 VOSK_MODEL_PATH = os.environ['VOSK_MODEL_PATH']
-WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'oye r2 d2')
+WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'arturito')
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
 
 
