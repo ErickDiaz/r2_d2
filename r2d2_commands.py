@@ -16,8 +16,8 @@ class R2D2LocalCommands:
         self._commands = {
             'apaga la pi': self._power_off,
             'reinicia la pi': self._reboot,
-            'cual es tu ip': self._say_ip,
-            'dime tu ip': self._say_ip,
+            'cual es tu direccion': self._say_ip,
+            'dime tu direccion': self._say_ip,
         }
 
     def dispatch(self, text):

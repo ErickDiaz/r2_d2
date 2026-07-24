@@ -135,11 +135,15 @@ Frases reconocidas por `R2D2LocalCommands`:
 |---|---|
 | "apaga la pi" | Apaga la Raspberry Pi |
 | "reinicia la pi" | Reinicia la Raspberry Pi |
-| "cual es tu ip" / "dime tu ip" | Dice la IP local por voz |
+| "cual es tu direccion" / "dime tu direccion" | Dice la IP local por voz |
 
 Si `Vosk` transcribe tus frases distinto (con o sin tildes, otro orden de
 palabras), ajusta las claves de `R2D2LocalCommands._commands` en
-`r2d2_commands.py` para que calcen exactamente.
+`r2d2_commands.py` para que calcen exactamente. **Evitá abreviaturas o
+palabras que no sean español real** (ej. "ip", "r2", "d2") — el modelo de
+Vosk no las tiene en su vocabulario y las transcribe como la palabra real
+más parecida fonéticamente (confirmado en hardware: "cuál es tu ip" salió
+transcrito como "cuál es tu p m").
 
 ## Sonidos de R2-D2
 
