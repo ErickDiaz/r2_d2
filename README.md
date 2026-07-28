@@ -12,13 +12,14 @@ IP) y controlando dispositivos de Home Assistant.
 - **Micrófono**: USB (probado con un Razer Seiren Mini). El micrófono
   integrado del Google AIY Voice Kit 2.0 (HAT/Bonnet) se abandonó — ver
   "Por qué no usamos el HAT" abajo.
-- **Parlante**: pendiente de resolver. El altavoz original del kit está
-  cableado al conector propietario del HAT, no al jack de audífonos de la
-  Pi; hace falta un parlante USB o un mini amplificador para el jack 3.5mm.
-- **LED/botón del HAT**: pendiente por separado (no es solo estético — el
-  LED rojo parpadeante es parte del look de este R2-D2). `led_status.LedStatus`
-  ya está preparado para usarlo si se resuelve más adelante, pero hoy corre
-  sin él.
+- **Parlante**: resuelto con un parlante/amplificador conectado al jack de
+  audífonos de la Pi (el altavoz original del kit estaba cableado al
+  conector propietario del HAT, no al jack).
+- **Botón + LED**: aunque el HAT ya no está conectado, el botón y su LED
+  van directo a dos pines GPIO del Pi (`GPIO23`/`GPIO25`) — no dependen del
+  driver roto del HAT. Ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md) para
+  cablearlos directo al header de 40 pines. `led_status.LedStatus` y
+  `push_to_talk.PushToTalkButton` ya usan esos pines.
 
 ### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
 
@@ -212,16 +213,19 @@ uso.
 - **`text_to_speech.say`** — usa `aiy.voice.tts` (pico2wave) si está
   disponible, si no cae a `espeak-ng`, si no hay ninguno solo loggea.
 - **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
-  en el LED del HAT; si `aiy.board` no está disponible, no hace nada en vez
-  de romper el resto del pipeline.
+  prendiendo/apagando/pulsando el LED del botón vía `gpiozero.PWMLED(25)`,
+  directo por GPIO (ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)).
+- **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
+  `gpiozero.Button(23)`; al apretarlo dispara la escucha del comando igual
+  que la wake word.
 - **`r2d2_with_local_commands.R2D2Assistant`** — (legado, Google Assistant)
   despacha eventos (tabla evento → handler) y comandos de voz (tabla frase →
   handler) en vez de una cadena larga de `if/elif`.
 
 ## Roadmap / ideas pendientes
 
-- Retomar el LED/botón del HAT — sin drivers en Bullseye; evaluar si vale la
-  pena portar el driver o controlar el LED directo por GPIO/I2C.
+- Cablear físicamente el botón/LED al GPIO ([`BUTTON_WIRING.md`](BUTTON_WIRING.md))
+  y validar `test_button_led.py` en hardware real.
 - Evaluar mover el control de Home Assistant a *function calling* de Gemini
   (que el propio modelo decida la acción en vez de matching exacto de
   frases) si el matching por `smart_home_commands.json` resulta limitado.

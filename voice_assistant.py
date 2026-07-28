@@ -27,6 +27,7 @@ from gemini_assistant import GeminiAssistant
 from home_assistant import HomeAssistantClient
 from idle_chatter import IdleChatter
 from led_status import LedStatus
+from push_to_talk import PushToTalkButton
 from r2d2_commands import R2D2LocalCommands
 from smart_home_dispatcher import SmartHomeDispatcher
 from sounds import SoundBoard
@@ -65,6 +66,8 @@ def main():
     if not gemini:
         print('GEMINI_API_KEY no configurada: no se respondran preguntas abiertas')
 
+    button = PushToTalkButton()
+
     with ExitStack() as stack:
         led = LedStatus(stack)
         stream = stack.enter_context(
@@ -77,12 +80,13 @@ def main():
 
         led.ready()
         sounds.play('hola')
-        print('Escuchando wake word: "%s"...' % WAKE_PHRASE)
+        print('Escuchando wake word: "%s" (o el boton)...' % WAKE_PHRASE)
         while True:
-            if not detector.detect(read_chunk(CHUNK_SIZE)):
+            chunk = read_chunk(CHUNK_SIZE)
+            if not detector.detect(chunk) and not button.is_pressed:
                 continue
 
-            print('Wake word detectada')
+            print('Wake word/boton detectado')
             led.listening()
             # wait=True: don't start listening for the command until the R2-D2
             # sound effect finishes, or the mic picks up its own speaker output.
