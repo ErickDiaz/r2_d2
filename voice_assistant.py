@@ -11,7 +11,7 @@ Configuration via environment variables (or a .env file in this directory):
   HA_TOKEN                 Home Assistant long-lived access token
   HA_COMMANDS_PATH         path to the phrase -> service JSON config (default: smart_home_commands.json)
   GEMINI_API_KEY           Google Gemini API key, for answering open questions (optional)
-  GEMINI_MODEL             Gemini model name (default: gemini-2.0-flash)
+  GEMINI_MODEL             Gemini model name (default: gemini-flash-latest)
 """
 
 import os
@@ -47,7 +47,7 @@ IDLE_CHATTER_MIN_SECONDS = float(os.getenv('IDLE_CHATTER_MIN_SECONDS', 5400))
 IDLE_CHATTER_MAX_SECONDS = float(os.getenv('IDLE_CHATTER_MAX_SECONDS', 10800))
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
-GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
 
 
 def main():

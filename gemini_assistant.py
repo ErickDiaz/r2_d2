@@ -11,7 +11,7 @@ GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/{model}:ge
 class GeminiAssistant:
     """Sends recognized text to Gemini and returns its text response."""
 
-    def __init__(self, api_key, model='gemini-2.0-flash'):
+    def __init__(self, api_key, model='gemini-flash-latest'):
         self._api_key = api_key
         self._model = model
 

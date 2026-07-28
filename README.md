@@ -139,7 +139,7 @@ Variables de entorno opcionales: `WAKE_PHRASE` (default `"arturito"` — nombre
 en español de R2-D2; confirmado en el vocabulario del modelo de Vosk, a
 diferencia de "r2"/"d2" que el modelo ignora por no ser palabras reales),
 `HA_COMMANDS_PATH` (default `smart_home_commands.json`) y `GEMINI_MODEL`
-(default `gemini-2.0-flash`). Si no seteas `HA_URL`/`HA_TOKEN` o
+(default `gemini-flash-latest`). Si no seteas `HA_URL`/`HA_TOKEN` o
 `GEMINI_API_KEY`, el asistente corre igual, solo sin esas piezas.
 
 **Orden de despacho**: cuando se reconoce un comando, se prueba primero
