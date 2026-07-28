@@ -12,14 +12,19 @@ Configuration via environment variables (or a .env file in this directory):
   HA_COMMANDS_PATH         path to the phrase -> service JSON config (default: smart_home_commands.json)
   GEMINI_API_KEY           Google Gemini API key, for answering open questions (optional)
   GEMINI_MODEL             Gemini model name (default: gemini-flash-latest)
+  PIPER_BIN                path to the piper binary, for a natural TTS voice (optional)
+  PIPER_MODEL              path to a piper .onnx voice model (optional)
 """
 
 import os
 from contextlib import ExitStack
 
+from dotenv import load_dotenv
+
+load_dotenv()  # must run before importing our own modules that read env vars at import time
+
 import sounddevice as sd
 import vosk
-from dotenv import load_dotenv
 from pygame import mixer
 
 import text_to_speech
@@ -33,8 +38,6 @@ from smart_home_dispatcher import SmartHomeDispatcher
 from sounds import SoundBoard
 from speech_to_text import VoskTranscriber
 from wakeword import VoskWakeWordDetector
-
-load_dotenv()
 
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 4000  # 0.25s @ 16kHz

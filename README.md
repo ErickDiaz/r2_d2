@@ -118,7 +118,17 @@ Antes de correrlo hace falta:
 4. **API key de Gemini** (opcional, preguntas abiertas): crear una en
    [aistudio.google.com/apikey](https://aistudio.google.com/apikey) y
    exportarla como `GEMINI_API_KEY`. Si no se setea, el asistente sigue
-   funcionando igual, solo sin responder preguntas generales.
+   funcionando igual, solo sin responder preguntas generales. Usá el
+   modelo `gemini-flash-latest` — otros como `gemini-2.0-flash` pueden no
+   tener cuota gratuita asignada para cuentas nuevas.
+5. **Piper** (opcional, voz más natural que `espeak-ng`): descargar el
+   binario para armv7 desde las [releases de Piper](https://github.com/rhasspy/piper/releases)
+   y una voz en español (p. ej.
+   [`es_MX/ald/x_low`](https://huggingface.co/rhasspy/piper-voices/tree/main/es/es_MX/ald/x_low),
+   liviana, ~20MB) desde el repo de
+   [piper-voices en Hugging Face](https://huggingface.co/rhasspy/piper-voices).
+   Apuntar `PIPER_BIN` al ejecutable y `PIPER_MODEL` al archivo `.onnx`. Sin
+   esto, cae a `aiy.voice.tts`/`espeak-ng` (más robótico, pero más rápido).
 
 Todas estas variables se pueden poner en un archivo `.env` en la raíz del
 repo (no se sube a git) en vez de exportarlas a mano — `voice_assistant.py`
@@ -210,10 +220,11 @@ uso.
 - **`r2d2_commands.R2D2LocalCommands`** — mapea frases reconocidas a acciones
   locales (apagar, reiniciar, decir IP), con voz (`text_to_speech.say`) y
   sonidos (`SoundBoard`) de feedback.
-- **`text_to_speech.say`** — usa `aiy.voice.tts` (pico2wave) si está
-  disponible, si no cae a `espeak-ng`, si no hay ninguno solo loggea.
+- **`text_to_speech.say`** — usa Piper (voz neuronal, si `PIPER_BIN`/
+  `PIPER_MODEL` están seteados) si está disponible, si no `aiy.voice.tts`
+  (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
 - **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
-  prendiendo/apagando/pulsando el LED del botón vía `gpiozero.PWMLED(25)`,
+  prendiendo/apagando/parpadeando el LED del botón vía `gpiozero.LED(25)`,
   directo por GPIO (ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)).
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
   `gpiozero.Button(23)`; al apretarlo dispara la escucha del comando igual
@@ -231,6 +242,11 @@ uso.
   frases) si el matching por `smart_home_commands.json` resulta limitado.
 - Afinar `WAKE_PHRASE` según lo que Vosk realmente transcriba (probar en
   hardware real: tasa de falsos positivos/negativos).
-- Reemplazar `pico2wave`/`aiy.voice.tts`/`espeak-ng` por Piper para una voz
-  más natural.
+- El modelo grande de Vosk en español no es viable en esta Pi 3 (falla al
+  cargar por RAM insuficiente) — evaluar Whisper.cpp (tiny/base) como
+  alternativa si la precisión de STT sigue siendo un problema, o aceptar
+  el límite del modelo chico para preguntas abiertas.
+- `text_to_speech.say` con Piper recarga el modelo en cada llamada
+  (~5-10s de latencia por respuesta) — evaluar un proceso persistente si
+  la latencia resulta molesta en el uso real.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.
