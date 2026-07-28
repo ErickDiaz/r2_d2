@@ -114,20 +114,32 @@ Antes de correrlo hace falta:
    `domain`/`service` son los de cualquier [servicio de Home Assistant](https://www.home-assistant.io/docs/scripts/service-calls/)
    (`light.turn_on`, `switch.toggle`, `cover.open_cover`, etc.) y el resto de
    claves se mandan tal cual como datos del servicio.
+4. **API key de Gemini** (opcional, preguntas abiertas): crear una en
+   [aistudio.google.com/apikey](https://aistudio.google.com/apikey) y
+   exportarla como `GEMINI_API_KEY`. Si no se setea, el asistente sigue
+   funcionando igual, solo sin responder preguntas generales.
 
 ```bash
 export VOSK_MODEL_PATH=/ruta/a/vosk-model-small-es-0.42
 export HA_URL=http://homeassistant.local:8123
 export HA_TOKEN=<tu-long-lived-token>
+export GEMINI_API_KEY=<tu-api-key>
 python3 voice_assistant.py
 ```
 
 Variables de entorno opcionales: `WAKE_PHRASE` (default `"arturito"` — nombre
 en español de R2-D2; confirmado en el vocabulario del modelo de Vosk, a
-diferencia de "r2"/"d2" que el modelo ignora por no ser palabras reales) y
-`HA_COMMANDS_PATH` (default `smart_home_commands.json`). Si no seteas
-`HA_URL`/`HA_TOKEN`, el asistente corre igual, solo sin el dispatcher de
-Home Assistant.
+diferencia de "r2"/"d2" que el modelo ignora por no ser palabras reales),
+`HA_COMMANDS_PATH` (default `smart_home_commands.json`) y `GEMINI_MODEL`
+(default `gemini-2.0-flash`). Si no seteas `HA_URL`/`HA_TOKEN` o
+`GEMINI_API_KEY`, el asistente corre igual, solo sin esas piezas.
+
+**Orden de despacho**: cuando se reconoce un comando, se prueba primero
+`R2D2LocalCommands` (apagar/reiniciar/IP), después `SmartHomeDispatcher`
+(si está configurado) y, solo si ninguno matchea la frase exacta, se manda
+el texto a Gemini (`GeminiAssistant.ask`) como pregunta abierta y se
+responde por voz. Gemini es el último recurso, no reemplaza el matching
+exacto de los otros dos.
 
 Frases reconocidas por `R2D2LocalCommands`:
 
@@ -184,6 +196,9 @@ uso.
   Assistant vía su API REST.
 - **`smart_home_dispatcher.SmartHomeDispatcher`** — mapea frases reconocidas
   (`smart_home_commands.json`) a llamadas de `HomeAssistantClient`.
+- **`gemini_assistant.GeminiAssistant`** — última instancia del despacho:
+  manda a la API de Gemini el texto que ningún otro dispatcher reconoció, y
+  devuelve la respuesta para decirla por voz.
 - **`r2d2_commands.R2D2LocalCommands`** — mapea frases reconocidas a acciones
   locales (apagar, reiniciar, decir IP), con voz (`text_to_speech.say`) y
   sonidos (`SoundBoard`) de feedback.
@@ -200,6 +215,9 @@ uso.
 
 - Retomar el LED/botón del HAT — sin drivers en Bullseye; evaluar si vale la
   pena portar el driver o controlar el LED directo por GPIO/I2C.
+- Evaluar mover el control de Home Assistant a *function calling* de Gemini
+  (que el propio modelo decida la acción en vez de matching exacto de
+  frases) si el matching por `smart_home_commands.json` resulta limitado.
 - Afinar `WAKE_PHRASE` según lo que Vosk realmente transcriba (probar en
   hardware real: tasa de falsos positivos/negativos).
 - Reemplazar `pico2wave`/`aiy.voice.tts`/`espeak-ng` por Piper para una voz

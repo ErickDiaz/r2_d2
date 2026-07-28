@@ -10,6 +10,8 @@ Configuration via environment variables:
   HA_URL                   Home Assistant base URL, e.g. http://homeassistant.local:8123
   HA_TOKEN                 Home Assistant long-lived access token
   HA_COMMANDS_PATH         path to the phrase -> service JSON config (default: smart_home_commands.json)
+  GEMINI_API_KEY           Google Gemini API key, for answering open questions (optional)
+  GEMINI_MODEL             Gemini model name (default: gemini-2.0-flash)
 """
 
 import os
@@ -19,6 +21,8 @@ import sounddevice as sd
 import vosk
 from pygame import mixer
 
+import text_to_speech
+from gemini_assistant import GeminiAssistant
 from home_assistant import HomeAssistantClient
 from idle_chatter import IdleChatter
 from led_status import LedStatus
@@ -38,6 +42,8 @@ WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'arturito')
 IDLE_CHATTER_MIN_SECONDS = float(os.getenv('IDLE_CHATTER_MIN_SECONDS', 5400))
 IDLE_CHATTER_MAX_SECONDS = float(os.getenv('IDLE_CHATTER_MAX_SECONDS', 10800))
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
+GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-2.0-flash')
 
 
 def main():
@@ -51,6 +57,10 @@ def main():
         dispatchers.append(SmartHomeDispatcher(HomeAssistantClient.from_env(), HA_COMMANDS_PATH))
     else:
         print('HA_URL/HA_TOKEN no configurados: el dispatcher de Home Assistant esta deshabilitado')
+
+    gemini = GeminiAssistant(GEMINI_API_KEY, GEMINI_MODEL) if GEMINI_API_KEY else None
+    if not gemini:
+        print('GEMINI_API_KEY no configurada: no se respondran preguntas abiertas')
 
     with ExitStack() as stack:
         led = LedStatus(stack)
@@ -79,7 +89,15 @@ def main():
             print('Comando reconocido:', text)
 
             if not any(dispatcher.dispatch(text) for dispatcher in dispatchers):
-                print('Comando no reconocido:', text)
+                if gemini and text.strip():
+                    try:
+                        answer = gemini.ask(text)
+                        print('Gemini respondio:', answer)
+                        text_to_speech.say(answer)
+                    except Exception as error:
+                        print('Error consultando a Gemini:', error)
+                else:
+                    print('Comando no reconocido:', text)
             led.ready()
 
 
