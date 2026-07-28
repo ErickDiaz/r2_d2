@@ -1,6 +1,6 @@
 pygame
 gpiozero
-lgpio
+RPi.GPIO
 vosk
 sounddevice
 numpy
