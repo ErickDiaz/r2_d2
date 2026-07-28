@@ -2,7 +2,7 @@
 command that follows, and dispatches it to R2-D2's local commands or to
 Home Assistant.
 
-Configuration via environment variables:
+Configuration via environment variables (or a .env file in this directory):
   VOSK_MODEL_PATH          path to an unzipped Vosk model directory (required)
   WAKE_PHRASE              phrase that triggers listening (default: "arturito")
   IDLE_CHATTER_MIN_SECONDS minimum gap between idle sounds (default: 5400, 1.5h)
@@ -19,6 +19,7 @@ from contextlib import ExitStack
 
 import sounddevice as sd
 import vosk
+from dotenv import load_dotenv
 from pygame import mixer
 
 import text_to_speech
@@ -31,6 +32,8 @@ from smart_home_dispatcher import SmartHomeDispatcher
 from sounds import SoundBoard
 from speech_to_text import VoskTranscriber
 from wakeword import VoskWakeWordDetector
+
+load_dotenv()
 
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 4000  # 0.25s @ 16kHz

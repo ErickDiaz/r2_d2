@@ -119,11 +119,18 @@ Antes de correrlo hace falta:
    exportarla como `GEMINI_API_KEY`. Si no se setea, el asistente sigue
    funcionando igual, solo sin responder preguntas generales.
 
+Todas estas variables se pueden poner en un archivo `.env` en la raíz del
+repo (no se sube a git) en vez de exportarlas a mano — `voice_assistant.py`
+lo carga automáticamente al arrancar (vía `python-dotenv`):
+
+```
+VOSK_MODEL_PATH=/ruta/a/vosk-model-small-es-0.42
+HA_URL=http://homeassistant.local:8123
+HA_TOKEN=tu-long-lived-token
+GEMINI_API_KEY=tu-api-key
+```
+
 ```bash
-export VOSK_MODEL_PATH=/ruta/a/vosk-model-small-es-0.42
-export HA_URL=http://homeassistant.local:8123
-export HA_TOKEN=<tu-long-lived-token>
-export GEMINI_API_KEY=<tu-api-key>
 python3 voice_assistant.py
 ```
 
