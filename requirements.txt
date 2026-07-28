@@ -1,5 +1,6 @@
 pygame
 gpiozero
+lgpio
 vosk
 sounddevice
 numpy
