@@ -2,6 +2,7 @@
 
 import csv
 import os
+import random
 import time
 
 
@@ -30,3 +31,7 @@ class SoundBoard:
         self._mixer.music.play()
         while wait and self._mixer.music.get_busy():
             time.sleep(0.1)
+
+    def play_random(self, names, wait=False):
+        """Play a random clip from `names`. See play()."""
+        self.play(random.choice(names), wait=wait)

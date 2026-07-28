@@ -28,6 +28,8 @@ from wakeword import VoskWakeWordDetector
 SAMPLE_RATE = 16000
 CHUNK_SIZE = 4000  # 0.25s @ 16kHz
 
+ACK_SOUNDS = ['beep_qword4', 'beep_qword1', 'sad', 'proud']
+
 VOSK_MODEL_PATH = os.environ['VOSK_MODEL_PATH']
 WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'arturito')
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
@@ -65,7 +67,7 @@ def main():
             led.listening()
             # wait=True: don't start listening for the command until the R2-D2
             # sound effect finishes, or the mic picks up its own speaker output.
-            sounds.play('processing', wait=True)
+            sounds.play_random(ACK_SOUNDS, wait=True)
             text = transcriber.transcribe(read_chunk, CHUNK_SIZE)
             led.thinking()
             print('Comando reconocido:', text)

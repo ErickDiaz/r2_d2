@@ -148,9 +148,18 @@ transcrito como "cuál es tu p m").
 ## Sonidos de R2-D2
 
 Los clips en `sounds/` (indexados en `sounds_data.csv`) vienen de
-[r2d2translator.com](http://www.r2d2translator.com/). Se cargan y reproducen
-mediante `sounds.SoundBoard`, que asocia cada nombre lógico (`hola`, `eureka`,
-`processing`, `proud`, `sad`, `concerned`, `sure`) a su archivo.
+[r2d2translator.com](http://www.r2d2translator.com/) (`hola`, `eureka`,
+`processing`, `proud`, `sad`, `concerned`, `sure`) y de
+[jpkeisala/Random-R2-D2-sound](https://github.com/jpkeisala/Random-R2-D2-sound)
+(los `beep_qword*`). Se cargan y reproducen mediante `sounds.SoundBoard`.
+
+`voice_assistant.py` usa `sounds.play_random(ACK_SOUNDS, wait=True)` como
+sonido de confirmación al detectar la wake word — un pitido corto elegido al
+azar entre `beep_qword4`, `beep_qword1`, `sad` y `proud` (todos < 1.5s, más
+cortos que `processing`, que dura ~2.1s y ya no se usa para esto). Los clips
+más largos (`beep_qword8`, `beep_qword9`, `beep_qword16`, `beep_qword22`,
+`eureka`, `concerned`) quedan catalogados en `sounds_data.csv` sin usarse
+todavía, por si sirven para otra cosa más adelante.
 
 ## Arquitectura
 
