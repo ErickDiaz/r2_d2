@@ -3,11 +3,13 @@ command that follows, and dispatches it to R2-D2's local commands or to
 Home Assistant.
 
 Configuration via environment variables:
-  VOSK_MODEL_PATH   path to an unzipped Vosk model directory (required)
-  WAKE_PHRASE       phrase that triggers listening (default: "arturito")
-  HA_URL            Home Assistant base URL, e.g. http://homeassistant.local:8123
-  HA_TOKEN          Home Assistant long-lived access token
-  HA_COMMANDS_PATH  path to the phrase -> service JSON config (default: smart_home_commands.json)
+  VOSK_MODEL_PATH          path to an unzipped Vosk model directory (required)
+  WAKE_PHRASE              phrase that triggers listening (default: "arturito")
+  IDLE_CHATTER_MIN_SECONDS minimum gap between idle sounds (default: 5400, 1.5h)
+  IDLE_CHATTER_MAX_SECONDS maximum gap between idle sounds (default: 10800, 3h)
+  HA_URL                   Home Assistant base URL, e.g. http://homeassistant.local:8123
+  HA_TOKEN                 Home Assistant long-lived access token
+  HA_COMMANDS_PATH         path to the phrase -> service JSON config (default: smart_home_commands.json)
 """
 
 import os
@@ -18,6 +20,7 @@ import vosk
 from pygame import mixer
 
 from home_assistant import HomeAssistantClient
+from idle_chatter import IdleChatter
 from led_status import LedStatus
 from r2d2_commands import R2D2LocalCommands
 from smart_home_dispatcher import SmartHomeDispatcher
@@ -32,6 +35,8 @@ ACK_SOUNDS = ['beep_qword4', 'beep_qword1', 'sad', 'proud']
 
 VOSK_MODEL_PATH = os.environ['VOSK_MODEL_PATH']
 WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'arturito')
+IDLE_CHATTER_MIN_SECONDS = float(os.getenv('IDLE_CHATTER_MIN_SECONDS', 5400))
+IDLE_CHATTER_MAX_SECONDS = float(os.getenv('IDLE_CHATTER_MAX_SECONDS', 10800))
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
 
 
@@ -40,6 +45,7 @@ def main():
     detector = VoskWakeWordDetector(model, WAKE_PHRASE, sample_rate=SAMPLE_RATE)
     transcriber = VoskTranscriber(model, sample_rate=SAMPLE_RATE)
     sounds = SoundBoard(mixer)
+    IdleChatter(sounds, sounds.names, IDLE_CHATTER_MIN_SECONDS, IDLE_CHATTER_MAX_SECONDS).start()
     dispatchers = [R2D2LocalCommands(sounds)]
     if os.getenv('HA_URL') and os.getenv('HA_TOKEN'):
         dispatchers.append(SmartHomeDispatcher(HomeAssistantClient.from_env(), HA_COMMANDS_PATH))

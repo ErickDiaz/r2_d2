@@ -158,13 +158,18 @@ sonido de confirmación al detectar la wake word — un pitido corto elegido al
 azar entre `beep_qword4`, `beep_qword1`, `sad` y `proud` (todos < 1.5s, más
 cortos que `processing`, que dura ~2.1s y ya no se usa para esto). Los clips
 más largos (`beep_qword8`, `beep_qword9`, `beep_qword16`, `beep_qword22`,
-`eureka`, `concerned`) quedan catalogados en `sounds_data.csv` sin usarse
-todavía, por si sirven para otra cosa más adelante.
+`eureka`, `concerned`) no se usan para la confirmación, pero sí los usa
+`IdleChatter` (ver abajo) para el "parloteo" ambiental — así no quedan sin
+uso.
 
 ## Arquitectura
 
 - **`sounds.SoundBoard`** — carga `sounds_data.csv` y reproduce clips por
   nombre sobre un mixer de `pygame`.
+- **`idle_chatter.IdleChatter`** — hilo en background que reproduce un
+  sonido al azar (de todo el catálogo de `SoundBoard`) cada intervalo
+  aleatorio entre `IDLE_CHATTER_MIN_SECONDS` y `IDLE_CHATTER_MAX_SECONDS`
+  (default 1.5-3h), para que R2-D2 "parlotee" solo de tanto en tanto.
 - **`text_normalize.normalize`** — quita mayúsculas y tildes antes de
   comparar frases reconocidas contra los comandos configurados (usado por
   `wakeword`, `r2d2_commands` y `smart_home_dispatcher`); sin esto, "cuál"
@@ -193,7 +198,6 @@ todavía, por si sirven para otra cosa más adelante.
 
 ## Roadmap / ideas pendientes
 
-- Resolver el parlante (USB o mini-amp al jack 3.5mm).
 - Retomar el LED/botón del HAT — sin drivers en Bullseye; evaluar si vale la
   pena portar el driver o controlar el LED directo por GPIO/I2C.
 - Afinar `WAKE_PHRASE` según lo que Vosk realmente transcriba (probar en

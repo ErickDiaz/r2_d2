@@ -35,3 +35,7 @@ class SoundBoard:
     def play_random(self, names, wait=False):
         """Play a random clip from `names`. See play()."""
         self.play(random.choice(names), wait=wait)
+
+    @property
+    def names(self):
+        return list(self._sounds.keys())
