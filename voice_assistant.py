@@ -94,6 +94,11 @@ def main():
             # wait=True: don't start listening for the command until the R2-D2
             # sound effect finishes, or the mic picks up its own speaker output.
             sounds.play_random(ACK_SOUNDS, wait=True)
+            # The mic kept recording into its buffer while we were blocked
+            # above; discard that backlog so transcribe() starts on live
+            # audio instead of replaying stale silence first.
+            if stream.read_available:
+                stream.read(stream.read_available)
             text = transcriber.transcribe(read_chunk, CHUNK_SIZE)
             led.thinking()
             print('Comando reconocido:', text)
