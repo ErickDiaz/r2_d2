@@ -1,56 +1,67 @@
 # R2-D2 con Google AIY Voice Kit 2.0
 
-Asistente de voz para una réplica de R2-D2 impresa en 3D, montada sobre una
-**Raspberry Pi 3**. Reacciona a comandos de voz reproduciendo sonidos
-icónicos de R2-D2, ejecutando acciones locales (apagar, reiniciar, decir la
-IP) y controlando dispositivos de Home Assistant.
+Asistente de voz para una réplica de R2-D2 impresa en 3D. Reacciona a
+comandos de voz reproduciendo sonidos icónicos de R2-D2, ejecutando
+acciones locales (apagar, reiniciar, decir la IP), controlando
+dispositivos de Home Assistant, y respondiendo preguntas abiertas con
+Gemini.
+
+> **Esta branch (`jetson-nano-migration`) migra el proyecto de una
+> Raspberry Pi 3 a una Jetson Nano 2GB** que el usuario ya tenía disponible
+> sin usar. Motivo: en la Pi 3 (1GB RAM) el modelo grande de Vosk no cargaba
+> por falta de memoria y Piper (TTS) rendía lento; la Jetson tiene el doble
+> de RAM, un CPU más rápido por núcleo, y al ser 64 bits (aarch64) tiene
+> muchísima mejor disponibilidad de wheels de Python precompilados que el
+> ARMv7 de 32 bits de la Pi. La branch `local-voice-pipeline` conserva la
+> versión funcionando en Raspberry Pi si hace falta volver atrás.
 
 ## Hardware
 
-- Raspberry Pi 3 (Model B/B+).
+- Jetson Nano 2GB Developer Kit.
 - Carcasa de R2-D2 impresa en 3D: [tutorial](http://www.uswaterrockets.com/3D_Printing/3D_Printed_Star_Wars_Droid/tutorial.htm).
-- **Micrófono**: USB (probado con un Razer Seiren Mini). El micrófono
-  integrado del Google AIY Voice Kit 2.0 (HAT/Bonnet) se abandonó — ver
-  "Por qué no usamos el HAT" abajo.
-- **Parlante**: resuelto con un parlante/amplificador conectado al jack de
-  audífonos de la Pi (el altavoz original del kit estaba cableado al
-  conector propietario del HAT, no al jack).
-- **Botón + LED**: aunque el HAT ya no está conectado, el botón y su LED
-  van directo a dos pines GPIO del Pi (`GPIO23`/`GPIO25`) — no dependen del
-  driver roto del HAT. Ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md) para
-  cablearlos directo al header de 40 pines. `led_status.LedStatus` y
-  `push_to_talk.PushToTalkButton` ya usan esos pines.
+- **Micrófono**: USB (probado con un Razer Seiren Mini).
+- **Parlante**: la Jetson Nano 2GB **no tiene jack de audífonos** (a
+  diferencia de la Pi). El GPIO es solo digital, no sirve para sacar audio
+  analógico directo. Opciones: un parlante USB, o un adaptador USB-a-3.5mm
+  barato para reusar el parlante que ya tenías en la Pi. Evitar un DAC I2S
+  por GPIO (tipo MAX98357A) — es el mismo tipo de dolor de cabeza de
+  drivers que ya tuvimos con el HAT de Google.
+- **Botón + LED**: van directo a dos pines GPIO — no dependen de ningún
+  driver de HAT. El header de 40 pines es mecánicamente igual entre la Pi y
+  la Jetson (J41), así que el cableado físico es el mismo en ambas. Ver
+  [`BUTTON_WIRING.md`](BUTTON_WIRING.md). En la Jetson, `led_status.py`/
+  `push_to_talk.py` usan `Jetson.GPIO` en vez de `gpiozero` (que no soporta
+  Jetson).
 
 ### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
 
-Se probó exhaustivamente en hardware real: **Raspberry Pi OS Bullseye,
-Bookworm y Trixie fallan de forma idéntica** — los módulos del kernel del
-HAT (`snd_soc_googlevoicehat_codec`, `snd_soc_rpi_simple_soundcard`,
+Se probó exhaustivamente en hardware real (Raspberry Pi): **Raspberry Pi OS
+Bullseye, Bookworm y Trixie fallan de forma idéntica** — los módulos del
+kernel del HAT (`snd_soc_googlevoicehat_codec`, `snd_soc_rpi_simple_soundcard`,
 `snd_soc_bcm2835_i2s`) cargan sin error, pero la tarjeta de sonido ALSA
 nunca se registra. Solo la imagen oficial `aiyprojects-2018-11-16.img.xz`
 (Raspbian 9 "stretch") tiene el audio del HAT funcionando de fábrica — pero
 su glibc (2.24) es demasiado viejo para `vosk` y otros paquetes modernos con
-código compilado (confirmado: `vosk` instala pero falla al importar con
-`GLIBC_2.27' not found`). No hay ninguna imagen que dé ambas cosas a la vez,
-así que se optó por abandonar el audio del HAT y usar un micrófono USB
-genérico + Raspberry Pi OS Bullseye (glibc 2.31, Python 3.9, buen soporte de
-paquetes).
+código compilado. No hay ninguna imagen de Pi que diera ambas cosas a la
+vez, así que se optó por abandonar el audio del HAT y usar un micrófono USB
+genérico — decisión que se mantiene igual en la Jetson.
 
 ## Software
 
 ### Sistema operativo
 
-**Raspberry Pi OS Bullseye (Legacy, 32-bit)**. No viene en el catálogo
-normal de Raspberry Pi Imager (que ahora ofrece Bookworm/Trixie) — hay que
-descargar la imagen del archivo oficial:
+**JetPack 4.x (Ubuntu 18.04)** — la última versión de JetPack que soporta
+la Jetson Nano. Se flashea con [NVIDIA SDK Manager](https://developer.nvidia.com/sdk-manager)
+o escribiendo la imagen de tarjeta SD directamente (Jetson Nano 2GB arranca
+desde SD, no tiene almacenamiento interno). Ver la
+[guía oficial](https://developer.nvidia.com/embedded/learn/get-started-jetson-nano-2gb-devkit).
 
-```
-https://downloads.raspberrypi.com/raspios_lite_armhf/images/raspios_lite_armhf-2023-05-03/2023-05-03-raspios-bullseye-armhf-lite.img.xz
-```
-
-Al ser una imagen "custom" en Imager, el asistente de personalización
-(usuario/wifi/SSH) puede no aplicarse — si no, monta la partición `boot` y
-crea un archivo vacío llamado `ssh` para habilitarlo en el primer arranque.
+Ubuntu 18.04 trae glibc 2.27, que sí alcanza para `vosk` (a diferencia de
+la imagen vieja de Raspbian que se descartó en el intento con Pi). Python
+de sistema es 3.6 — no debería hacer falta compilar uno más nuevo como en
+Pi, porque al ser aarch64 (64 bits) casi todos los paquetes que usamos
+tienen wheels precompilados también para Python 3.6 en esa arquitectura;
+si algo falta, ahí sí habría que evaluar `pyenv`.
 
 ### Dependencias Python
 
@@ -60,16 +71,20 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Instala `pygame` (sonidos), `gpiozero`, `vosk` (reconocimiento de voz y wake
-word), `sounddevice` + `numpy` (captura de audio) y `requests` (Home
-Assistant). A nivel de sistema hace falta PortAudio, `espeak-ng` (respaldo de
-TTS) y las librerías de SDL2 (para `pygame`):
+Instala `pygame` (sonidos), `Jetson.GPIO` (botón/LED), `vosk`
+(reconocimiento de voz y wake word), `sounddevice` + `numpy` (captura de
+audio) y `requests` (Home Assistant). A nivel de sistema hace falta
+PortAudio, `espeak-ng` (respaldo de TTS) y las librerías de SDL2 (para
+`pygame`):
 
 ```bash
 sudo apt install libportaudio2 portaudio19-dev espeak-ng \
     libsdl2-2.0-0 libsdl2-mixer-2.0-0 libsdl2-image-2.0-0 libsdl2-ttf-2.0-0 \
     libopenblas0
 ```
+
+`Jetson.GPIO` suele venir preinstalado con JetPack; si no, `pip install
+Jetson.GPIO` alcanza (no necesita compilarse).
 
 ## Scripts
 
@@ -78,7 +93,7 @@ sudo apt install libportaudio2 portaudio19-dev espeak-ng \
 | `voice_assistant.py` | Front-end de voz local (sin Google): espera una wake word y transcribe el comando, ambos con `Vosk`, offline. |
 | `r2d2_with_local_commands.py` | Script original con Google Assistant Library (deprecada desde 2019) — legado, pensado para el HAT que ya no usamos. |
 | `r2d2.py` | Demo de referencia de Google usando la API gRPC del Assistant (legado). |
-| `r2_lights.py` | Prueba de hardware: parpadea dos LEDs por GPIO (pines A/B del HAT). |
+| `r2_lights.py` | Prueba de hardware vieja, específica de Pi+HAT (usa `aiy.pins` y `gpiozero`) — no aplica a la Jetson, dejada como referencia histórica. |
 
 ### Reconocimiento de voz local (sin Google) + control de Home Assistant
 
@@ -224,29 +239,33 @@ uso.
   `PIPER_MODEL` están seteados) si está disponible, si no `aiy.voice.tts`
   (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
 - **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
-  prendiendo/apagando/parpadeando el LED del botón vía `gpiozero.LED(25)`,
-  directo por GPIO (ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)).
+  prendiendo/apagando/parpadeando el LED del botón vía `Jetson.GPIO`
+  (pin físico 22, ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)). El parpadeo
+  de "pensando" es manual (hilo + `time.sleep`), porque `Jetson.GPIO` no
+  trae un helper de blink como `gpiozero`.
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
-  `gpiozero.Button(23)`; al apretarlo dispara la escucha del comando igual
-  que la wake word.
+  `Jetson.GPIO` (pin físico 16); al apretarlo dispara la escucha del
+  comando igual que la wake word.
 - **`r2d2_with_local_commands.R2D2Assistant`** — (legado, Google Assistant)
   despacha eventos (tabla evento → handler) y comandos de voz (tabla frase →
   handler) en vez de una cadena larga de `if/elif`.
 
 ## Roadmap / ideas pendientes
 
-- Cablear físicamente el botón/LED al GPIO ([`BUTTON_WIRING.md`](BUTTON_WIRING.md))
-  y validar `test_button_led.py` en hardware real.
+- Validar todo el pipeline en la Jetson Nano real (audio USB, wake word,
+  Piper, botón/LED por `Jetson.GPIO`) — esta branch migró el código pero
+  todavía no se probó en el dispositivo.
+- Re-evaluar el modelo grande de Vosk en español (`vosk-model-es-0.42`):
+  en la Pi 3 (1GB RAM) fallaba al cargar; con los 2GB de la Jetson podría
+  ser viable y mejorar bastante la precisión en preguntas abiertas.
+- Resolver el audio de salida (parlante USB o adaptador USB-a-3.5mm, ver
+  sección de Hardware) — la Jetson no tiene jack.
+- Confirmar el brillo del LED en la Jetson (su GPIO da menos corriente que
+  el de la Pi) y ajustar resistencia o agregar transistor si queda muy
+  tenue.
 - Evaluar mover el control de Home Assistant a *function calling* de Gemini
   (que el propio modelo decida la acción en vez de matching exacto de
   frases) si el matching por `smart_home_commands.json` resulta limitado.
 - Afinar `WAKE_PHRASE` según lo que Vosk realmente transcriba (probar en
   hardware real: tasa de falsos positivos/negativos).
-- El modelo grande de Vosk en español no es viable en esta Pi 3 (falla al
-  cargar por RAM insuficiente) — evaluar Whisper.cpp (tiny/base) como
-  alternativa si la precisión de STT sigue siendo un problema, o aceptar
-  el límite del modelo chico para preguntas abiertas.
-- `text_to_speech.say` con Piper recarga el modelo en cada llamada
-  (~5-10s de latencia por respuesta) — evaluar un proceso persistente si
-  la latencia resulta molesta en el uso real.
 - Agregar más comandos de voz, sonidos y servicios de Home Assistant.

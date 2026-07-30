@@ -1,6 +1,7 @@
 """Quick hardware test for the push-to-talk button and LED wired directly
-to GPIO23 (button) and GPIO25 (LED). Run this before trusting the full
-voice_assistant.py pipeline -- see BUTTON_WIRING.md.
+to physical pins 16 (button) and 22 (LED) of the 40-pin header. Run this
+before trusting the full voice_assistant.py pipeline -- see
+BUTTON_WIRING.md.
 """
 
 from contextlib import ExitStack

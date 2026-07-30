@@ -1,17 +1,23 @@
-"""Physical push-to-talk button, wired directly to the Pi's GPIO (BCM 23)
--- bypasses the AIY Voice Bonnet's own I2C/MCU driver, which isn't
-available on modern Raspberry Pi OS.
+"""Physical push-to-talk button, wired to physical pin 16 of the 40-pin
+header -- same physical position on both the Raspberry Pi and the Jetson
+Nano's J41 header (see BUTTON_WIRING.md). Uses Jetson.GPIO in BOARD mode,
+since gpiozero doesn't support Jetson boards.
 """
 
-from gpiozero import Button
+import Jetson.GPIO as GPIO
+
+_PIN = 16
 
 
 class PushToTalkButton:
-    """Wraps the AIY Voice Bonnet's arcade button, wired directly to GPIO23."""
+    """Wraps a momentary button wired to physical pin 16, pulled up (button
+    presses connect the pin to GND)."""
 
-    def __init__(self, pin=23):
-        self._button = Button(pin, pull_up=True)
+    def __init__(self, pin=_PIN):
+        self._pin = pin
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 
     @property
     def is_pressed(self):
-        return self._button.is_pressed
+        return GPIO.input(self._pin) == GPIO.LOW

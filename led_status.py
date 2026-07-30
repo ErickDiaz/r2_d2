@@ -1,27 +1,56 @@
-"""LED status feedback for the AIY Voice Bonnet's button LED, wired
-directly to the Pi's GPIO (BCM 25) -- bypasses the HAT's own I2C/MCU
-driver, which isn't available on modern Raspberry Pi OS. See
-BUTTON_WIRING.md for how to wire the button/LED to the Pi's header.
-
-Uses a plain digital LED, not PWMLED: GPIO25 has no hardware PWM support
-(only a few specific pins do), unlike the AIY firmware's original software
-PWM over RPi.GPIO, which works on any pin.
+"""LED status feedback, wired to physical pin 22 of the 40-pin header --
+same physical position on both the Raspberry Pi and the Jetson Nano's J41
+header (see BUTTON_WIRING.md). Uses Jetson.GPIO in BOARD mode, since
+gpiozero doesn't support Jetson boards.
 """
 
-from gpiozero import LED
+import threading
+
+import Jetson.GPIO as GPIO
+
+_PIN = 22
+_BLINK_SECONDS = 0.3
 
 
 class LedStatus:
     """Sets the button LED to reflect listening/thinking/ready states."""
 
-    def __init__(self, exit_stack, pin=25):
-        self._led = exit_stack.enter_context(LED(pin))
+    def __init__(self, exit_stack, pin=_PIN):
+        self._pin = pin
+        GPIO.setmode(GPIO.BOARD)
+        GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
+        exit_stack.callback(GPIO.cleanup, pin)
+        self._blink_thread = None
+        self._stop_blink = None
 
     def listening(self):
-        self._led.on()
+        self._stop_blinking()
+        GPIO.output(self._pin, GPIO.HIGH)
 
     def thinking(self):
-        self._led.blink()
+        self._start_blinking()
 
     def ready(self):
-        self._led.off()
+        self._stop_blinking()
+        GPIO.output(self._pin, GPIO.LOW)
+
+    def _start_blinking(self):
+        if self._blink_thread:
+            return
+        self._stop_blink = threading.Event()
+
+        def _run():
+            state = False
+            while not self._stop_blink.is_set():
+                state = not state
+                GPIO.output(self._pin, GPIO.HIGH if state else GPIO.LOW)
+                self._stop_blink.wait(_BLINK_SECONDS)
+
+        self._blink_thread = threading.Thread(target=_run, daemon=True)
+        self._blink_thread.start()
+
+    def _stop_blinking(self):
+        if self._blink_thread:
+            self._stop_blink.set()
+            self._blink_thread.join()
+            self._blink_thread = None
