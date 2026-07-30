@@ -21,7 +21,9 @@ class LedStatus:
         self._led.on()
 
     def thinking(self):
-        self._led.blink()
+        # Fast on/off so at least one full blink is visible even when the
+        # "thinking" phase (dispatch + TTS reply) only lasts a second or two.
+        self._led.blink(on_time=0.15, off_time=0.15)
 
     def ready(self):
         self._led.off()
