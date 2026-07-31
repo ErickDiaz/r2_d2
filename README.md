@@ -15,11 +15,13 @@ IP) y controlando dispositivos de Home Assistant.
 - **Parlante**: resuelto con un parlante/amplificador conectado al jack de
   audífonos de la Pi (el altavoz original del kit estaba cableado al
   conector propietario del HAT, no al jack).
-- **Botón + LED**: aunque el HAT ya no está conectado, el botón y su LED
-  van directo a dos pines GPIO del Pi (`GPIO23`/`GPIO25`) — no dependen del
-  driver roto del HAT. Ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md) para
-  cablearlos directo al header de 40 pines. `led_status.LedStatus` y
-  `push_to_talk.PushToTalkButton` ya usan esos pines.
+- **Botón + LED RGB**: aunque el HAT ya no está conectado, el botón y su
+  LED (confirmado RGB de ánodo común, 4 pines) van directo al GPIO del
+  Pi — no dependen del driver roto del HAT. Ver
+  [`BUTTON_WIRING.md`](BUTTON_WIRING.md) para cablearlos directo al header
+  de 40 pines. `led_status.LedStatus` y `push_to_talk.PushToTalkButton` ya
+  usan esos pines, con el efecto clásico de R2-D2 (azul fijo escuchando,
+  rojo/azul alternando mientras procesa).
 
 ### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
 
@@ -223,9 +225,10 @@ uso.
 - **`text_to_speech.say`** — usa Piper (voz neuronal, si `PIPER_BIN`/
   `PIPER_MODEL` están seteados) si está disponible, si no `aiy.voice.tts`
   (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
-- **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
-  prendiendo/apagando/parpadeando el LED del botón vía `gpiozero.LED(25)`,
-  directo por GPIO (ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)).
+- **`led_status.LedStatus`** — controla el LED RGB del botón (ánodo común
+  en GPIO25 + cátodos rojo/verde/azul en GPIO22/27/24, ver
+  [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): azul fijo escuchando, rojo/azul
+  alternando (hilo + `time.sleep`) mientras procesa, apagado en espera.
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
   `gpiozero.Button(23)`; al apretarlo dispara la escucha del comando igual
   que la wake word.

@@ -1,29 +1,69 @@
-"""LED status feedback for the AIY Voice Bonnet's button LED, wired
-directly to the Pi's GPIO (BCM 25) -- bypasses the HAT's own I2C/MCU
-driver, which isn't available on modern Raspberry Pi OS. See
-BUTTON_WIRING.md for how to wire the button/LED to the Pi's header.
-
-Uses a plain digital LED, not PWMLED: GPIO25 has no hardware PWM support
-(only a few specific pins do), unlike the AIY firmware's original software
-PWM over RPi.GPIO, which works on any pin.
+"""RGB LED status feedback via 4 GPIO pins on the button's common-anode
+RGB LED: shared anode (physical pin 22 / BCM25) plus three individual
+color cathodes -- red (physical pin 15 / BCM22), green (physical pin 13 /
+BCM27), blue (physical pin 18 / BCM24). See BUTTON_WIRING.md for wiring
+and how these pins were identified.
 """
+
+import threading
 
 from gpiozero import LED
 
+_COMMON_PIN = 25
+_RED_PIN = 22
+_GREEN_PIN = 27
+_BLUE_PIN = 24
+
 
 class LedStatus:
-    """Sets the button LED to reflect listening/thinking/ready states."""
+    """Sets the RGB button LED to reflect listening/thinking/ready states."""
 
-    def __init__(self, exit_stack, pin=25):
-        self._led = exit_stack.enter_context(LED(pin))
+    def __init__(self, exit_stack, blink_seconds=0.3):
+        self._blink_seconds = blink_seconds
+        self._common = exit_stack.enter_context(LED(_COMMON_PIN))
+        self._common.on()
+        self._red = exit_stack.enter_context(LED(_RED_PIN, active_high=False))
+        self._green = exit_stack.enter_context(LED(_GREEN_PIN, active_high=False))
+        self._blue = exit_stack.enter_context(LED(_BLUE_PIN, active_high=False))
+        self._pattern_thread = None
+        self._stop_pattern = None
 
     def listening(self):
-        self._led.on()
+        self._stop_blinking()
+        self._show(self._blue)
 
     def thinking(self):
-        # Fast on/off so at least one full blink is visible even when the
-        # "thinking" phase (dispatch + TTS reply) only lasts a second or two.
-        self._led.blink(on_time=0.15, off_time=0.15)
+        # Alternating red/blue, R2-D2's classic "processing" look.
+        self._start_blinking([self._red, self._blue])
 
     def ready(self):
-        self._led.off()
+        self._stop_blinking()
+        self._show(None)
+
+    def _show(self, led):
+        for color in (self._red, self._green, self._blue):
+            color.off()
+        if led:
+            led.on()
+
+    def _start_blinking(self, leds):
+        if self._pattern_thread:
+            return
+        self._stop_pattern = threading.Event()
+
+        def _run():
+            i = 0
+            while not self._stop_pattern.is_set():
+                self._show(leds[i % len(leds)])
+                i += 1
+                self._stop_pattern.wait(self._blink_seconds)
+            self._show(None)
+
+        self._pattern_thread = threading.Thread(target=_run, daemon=True)
+        self._pattern_thread.start()
+
+    def _stop_blinking(self):
+        if self._pattern_thread:
+            self._stop_pattern.set()
+            self._pattern_thread.join()
+            self._pattern_thread = None
