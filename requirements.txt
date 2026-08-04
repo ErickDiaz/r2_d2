@@ -1,5 +1,7 @@
 pygame
 Jetson.GPIO
+adafruit-blinka
+adafruit-circuitpython-neopixel-spi
 vosk
 sounddevice
 numpy

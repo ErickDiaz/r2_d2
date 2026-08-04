@@ -28,6 +28,7 @@ import vosk
 from pygame import mixer
 
 import text_to_speech
+from dome_lights import DomeLights
 from gemini_assistant import GeminiAssistant
 from home_assistant import HomeAssistantClient
 from idle_chatter import IdleChatter
@@ -73,6 +74,9 @@ def main():
 
     with ExitStack() as stack:
         led = LedStatus(stack)
+        # Luces del domo: efecto de logic display corriendo siempre de
+        # fondo, sin relacion con el estado de escucha/pensando del boton.
+        DomeLights(stack).flicker()
         stream = stack.enter_context(
             sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
         )
