@@ -1,56 +1,68 @@
-"""LED status feedback, wired to physical pin 22 of the 40-pin header --
-same physical position on both the Raspberry Pi and the Jetson Nano's J41
-header (see BUTTON_WIRING.md). Uses Jetson.GPIO in BOARD mode, since
+"""RGB LED status feedback via 4 GPIO pins on the button's common-anode
+RGB LED: shared anode (physical pin 22) plus three individual color
+cathodes -- red (physical pin 15), green (physical pin 13), blue (physical
+pin 18). Same physical pins on both the Raspberry Pi and the Jetson Nano's
+J41 header (see BUTTON_WIRING.md). Uses Jetson.GPIO in BOARD mode, since
 gpiozero doesn't support Jetson boards.
 """
 
+import random
 import threading
 
 import Jetson.GPIO as GPIO
 
-_PIN = 22
-_BLINK_SECONDS = 0.3
+_COMMON_PIN = 22
+_RED_PIN = 15
+_GREEN_PIN = 13
+_BLUE_PIN = 18
 
 
 class LedStatus:
-    """Sets the button LED to reflect listening/thinking/ready states."""
+    """Sets the RGB button LED to reflect listening/thinking/ready states."""
 
-    def __init__(self, exit_stack, pin=_PIN):
-        self._pin = pin
+    def __init__(self, exit_stack, blink_seconds=0.3):
+        self._blink_seconds = blink_seconds
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(pin, GPIO.OUT, initial=GPIO.LOW)
-        exit_stack.callback(GPIO.cleanup, pin)
-        self._blink_thread = None
-        self._stop_blink = None
+        GPIO.setup(_COMMON_PIN, GPIO.OUT, initial=GPIO.HIGH)
+        for pin in (_RED_PIN, _GREEN_PIN, _BLUE_PIN):
+            GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
+        exit_stack.callback(GPIO.cleanup, [_COMMON_PIN, _RED_PIN, _GREEN_PIN, _BLUE_PIN])
+        self._pattern_thread = None
+        self._stop_pattern = None
 
     def listening(self):
         self._stop_blinking()
-        GPIO.output(self._pin, GPIO.HIGH)
+        self._show(_RED_PIN)
 
     def thinking(self):
-        self._start_blinking()
+        # Random flicker between red/blue, R2-D2's classic "processing" look.
+        self._start_blinking([_RED_PIN, _BLUE_PIN])
 
     def ready(self):
         self._stop_blinking()
-        GPIO.output(self._pin, GPIO.LOW)
+        self._show(None)
 
-    def _start_blinking(self):
-        if self._blink_thread:
+    def _show(self, pin):
+        # Common-anode cathodes: LOW lights the LED, HIGH turns it off.
+        for p in (_RED_PIN, _GREEN_PIN, _BLUE_PIN):
+            GPIO.output(p, GPIO.LOW if p == pin else GPIO.HIGH)
+
+    def _start_blinking(self, pins):
+        if self._pattern_thread:
             return
-        self._stop_blink = threading.Event()
+        self._stop_pattern = threading.Event()
 
         def _run():
-            state = False
-            while not self._stop_blink.is_set():
-                state = not state
-                GPIO.output(self._pin, GPIO.HIGH if state else GPIO.LOW)
-                self._stop_blink.wait(_BLINK_SECONDS)
+            while not self._stop_pattern.is_set():
+                self._show(random.choice(pins))
+                self._stop_pattern.wait(self._blink_seconds)
+            self._show(None)
 
-        self._blink_thread = threading.Thread(target=_run, daemon=True)
-        self._blink_thread.start()
+        self._pattern_thread = threading.Thread(target=_run, daemon=True)
+        self._pattern_thread.start()
 
     def _stop_blinking(self):
-        if self._blink_thread:
-            self._stop_blink.set()
-            self._blink_thread.join()
-            self._blink_thread = None
+        if self._pattern_thread:
+            self._stop_pattern.set()
+            self._pattern_thread.join()
+            self._pattern_thread = None

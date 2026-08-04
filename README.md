@@ -19,19 +19,26 @@ Gemini.
 
 - Jetson Nano 2GB Developer Kit.
 - Carcasa de R2-D2 impresa en 3D: [tutorial](http://www.uswaterrockets.com/3D_Printing/3D_Printed_Star_Wars_Droid/tutorial.htm).
-- **Micrófono**: USB (probado con un Razer Seiren Mini).
+- **Micrófono**: USB (probado con un Razer Seiren Mini). El micrófono
+  integrado del Google AIY Voice Kit 2.0 (HAT/Bonnet) se abandonó — ver
+  "Por qué no usamos el HAT" abajo.
 - **Parlante**: la Jetson Nano 2GB **no tiene jack de audífonos** (a
-  diferencia de la Pi). El GPIO es solo digital, no sirve para sacar audio
-  analógico directo. Opciones: un parlante USB, o un adaptador USB-a-3.5mm
-  barato para reusar el parlante que ya tenías en la Pi. Evitar un DAC I2S
-  por GPIO (tipo MAX98357A) — es el mismo tipo de dolor de cabeza de
-  drivers que ya tuvimos con el HAT de Google.
-- **Botón + LED**: van directo a dos pines GPIO — no dependen de ningún
-  driver de HAT. El header de 40 pines es mecánicamente igual entre la Pi y
-  la Jetson (J41), así que el cableado físico es el mismo en ambas. Ver
-  [`BUTTON_WIRING.md`](BUTTON_WIRING.md). En la Jetson, `led_status.py`/
-  `push_to_talk.py` usan `Jetson.GPIO` en vez de `gpiozero` (que no soporta
-  Jetson).
+  diferencia de la Pi, donde se resolvió con un parlante/amplificador
+  conectado directo al jack). El GPIO es solo digital, no sirve para sacar
+  audio analógico directo. Opciones: un parlante USB, o un adaptador
+  USB-a-3.5mm barato para reusar el parlante que ya tenías en la Pi. Evitar
+  un DAC I2S por GPIO (tipo MAX98357A) — es el mismo tipo de dolor de
+  cabeza de drivers que ya tuvimos con el HAT de Google.
+- **Botón + LED RGB**: aunque el HAT ya no está conectado, el botón y su
+  LED (confirmado RGB de ánodo común, 4 pines) van directo al GPIO — no
+  dependen de ningún driver de HAT. El header de 40 pines es mecánicamente
+  igual entre la Pi y la Jetson (J41), así que el cableado físico es el
+  mismo en ambas. Ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md). En la
+  Jetson, `led_status.py`/`push_to_talk.py` usan `Jetson.GPIO` en vez de
+  `gpiozero` (que no soporta Jetson). `led_status.LedStatus` y
+  `push_to_talk.PushToTalkButton` ya usan esos pines, con el efecto
+  clásico de R2-D2 (rojo fijo escuchando, rojo/azul al azar mientras
+  procesa).
 
 ### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
 
@@ -238,11 +245,12 @@ uso.
 - **`text_to_speech.say`** — usa Piper (voz neuronal, si `PIPER_BIN`/
   `PIPER_MODEL` están seteados) si está disponible, si no `aiy.voice.tts`
   (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
-- **`led_status.LedStatus`** — refleja el estado (escuchando/pensando/listo)
-  prendiendo/apagando/parpadeando el LED del botón vía `Jetson.GPIO`
-  (pin físico 22, ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)). El parpadeo
-  de "pensando" es manual (hilo + `time.sleep`), porque `Jetson.GPIO` no
-  trae un helper de blink como `gpiozero`.
+- **`led_status.LedStatus`** — controla el LED RGB del botón vía
+  `Jetson.GPIO` (ánodo común en pin físico 22 + cátodos rojo/verde/azul en
+  pines físicos 15/13/18, ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): rojo
+  fijo escuchando, rojo/azul al azar (hilo + `time.sleep`, ya que
+  `Jetson.GPIO` no trae un helper de blink como `gpiozero`) mientras
+  procesa, apagado en espera.
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
   `Jetson.GPIO` (pin físico 16); al apretarlo dispara la escucha del
   comando igual que la wake word.
