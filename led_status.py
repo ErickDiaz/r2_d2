@@ -5,6 +5,7 @@ BCM27), blue (physical pin 18 / BCM24). See BUTTON_WIRING.md for wiring
 and how these pins were identified.
 """
 
+import random
 import threading
 
 from gpiozero import LED
@@ -30,10 +31,10 @@ class LedStatus:
 
     def listening(self):
         self._stop_blinking()
-        self._show(self._blue)
+        self._show(self._red)
 
     def thinking(self):
-        # Alternating red/blue, R2-D2's classic "processing" look.
+        # Random flicker between red/blue, R2-D2's classic "processing" look.
         self._start_blinking([self._red, self._blue])
 
     def ready(self):
@@ -52,10 +53,8 @@ class LedStatus:
         self._stop_pattern = threading.Event()
 
         def _run():
-            i = 0
             while not self._stop_pattern.is_set():
-                self._show(leds[i % len(leds)])
-                i += 1
+                self._show(random.choice(leds))
                 self._stop_pattern.wait(self._blink_seconds)
             self._show(None)
 

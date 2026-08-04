@@ -102,7 +102,7 @@ venv/bin/python3 test_button_led.py
 ```
 
 Esto ya usa el mapeo final (`led_status.LedStatus`): apretar el botón
-muestra azul fijo, soltarlo lo apaga. Si los colores salen cambiados
+muestra rojo fijo, soltarlo lo apaga. Si los colores salen cambiados
 (p. ej. lo que debería ser rojo prende verde), es porque cableaste los
 cátodos en otro orden — o intercambiá los cables físicamente, o ajustá las
 constantes `_RED_PIN`/`_GREEN_PIN`/`_BLUE_PIN` en `led_status.py` para que
@@ -114,6 +114,6 @@ coincidan con cómo quedó tu cableado real.
 `push_to_talk.PushToTalkButton` automáticamente — no hace falta tocar
 código. El botón funciona como alternativa a decir la wake word: al
 apretarlo, empieza a escuchar el comando igual que si hubieras dicho
-"arturito". El LED muestra **azul fijo** mientras escucha, **rojo/azul
-alternando** mientras procesa el comando (el look clásico de R2-D2), y se
-apaga cuando queda en espera.
+"arturito". El LED muestra **rojo fijo** mientras escucha, **rojo/azul al
+azar** mientras procesa el comando (el look clásico de R2-D2), y se apaga
+cuando queda en espera.

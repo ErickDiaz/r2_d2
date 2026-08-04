@@ -20,8 +20,8 @@ IP) y controlando dispositivos de Home Assistant.
   Pi — no dependen del driver roto del HAT. Ver
   [`BUTTON_WIRING.md`](BUTTON_WIRING.md) para cablearlos directo al header
   de 40 pines. `led_status.LedStatus` y `push_to_talk.PushToTalkButton` ya
-  usan esos pines, con el efecto clásico de R2-D2 (azul fijo escuchando,
-  rojo/azul alternando mientras procesa).
+  usan esos pines, con el efecto clásico de R2-D2 (rojo fijo escuchando,
+  rojo/azul al azar mientras procesa).
 
 ### Por qué no usamos el HAT (Google AIY Voice Kit 2.0)
 
@@ -227,8 +227,8 @@ uso.
   (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
 - **`led_status.LedStatus`** — controla el LED RGB del botón (ánodo común
   en GPIO25 + cátodos rojo/verde/azul en GPIO22/27/24, ver
-  [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): azul fijo escuchando, rojo/azul
-  alternando (hilo + `time.sleep`) mientras procesa, apagado en espera.
+  [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): rojo fijo escuchando, rojo/azul
+  al azar (hilo + `time.sleep`) mientras procesa, apagado en espera.
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
   `gpiozero.Button(23)`; al apretarlo dispara la escucha del comando igual
   que la wake word.
