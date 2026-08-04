@@ -74,9 +74,12 @@ def main():
 
     with ExitStack() as stack:
         led = LedStatus(stack)
-        # Luces del domo: efecto de logic display corriendo siempre de
-        # fondo, sin relacion con el estado de escucha/pensando del boton.
-        DomeLights(stack).flicker()
+        # Luces del domo: arrancan solas con su patron por defecto (logic
+        # display) y corren de fondo, sin relacion con el estado de
+        # escucha/pensando del boton. dome_lights.trigger(pattern,
+        # duration) permite reaccionar a un evento puntual sin tener que
+        # acordarse de revertirlo despues.
+        DomeLights(stack)
         stream = stack.enter_context(
             sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
         )

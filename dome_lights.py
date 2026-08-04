@@ -9,10 +9,17 @@ limitado a 2 pines y no alcanza la temporizacion de ~800kHz que exige el
 protocolo WS2812, pero el FIFO de hardware del SPI si puede generarla de
 forma confiable (ver DOME_LIGHTS_WIRING.md para el cableado y como
 habilitar SPI1 con jetson-io antes de correr esto).
+
+DomeLights corre un LightPattern de fondo en un hilo propio, para siempre
+(por defecto Flicker, el look de "logic display"). trigger() cambia el
+patron activo por una duracion determinada -- para reaccionar a un evento
+puntual -- y al vencer ese tiempo vuelve sola al patron por defecto, sin
+que el resto del codigo tenga que acordarse de revertirlo.
 """
 
 import random
 import threading
+import time
 
 import board
 import busio
@@ -22,19 +29,54 @@ _PIXELS_PER_STICK = 8
 _NUM_STICKS = 2
 _NUM_PIXELS = _PIXELS_PER_STICK * _NUM_STICKS
 
-_LEFT = slice(0, _PIXELS_PER_STICK)
-_RIGHT = slice(_PIXELS_PER_STICK, _NUM_PIXELS)
+LEFT = range(0, _PIXELS_PER_STICK)
+RIGHT = range(_PIXELS_PER_STICK, _NUM_PIXELS)
+BOTH = range(0, _NUM_PIXELS)
+
+_OFF = (0, 0, 0)
+_TICK_SECONDS = 0.15
+
+
+class LightPattern:
+    """Una animacion de las luces del domo. DomeLights llama a step() una
+    vez por tick; la implementacion decide que pixeles cambiar."""
+
+    def step(self, pixels):
+        raise NotImplementedError
+
+
+class Flicker(LightPattern):
+    """Prende un pixel al azar con un color al azar por tick -- el look
+    clasico de "computadora pensando" de un logic display."""
+
+    def __init__(self, colors, pixel_range=BOTH):
+        self._colors = colors
+        self._pixel_range = pixel_range
+
+    def step(self, pixels):
+        pixels[random.choice(self._pixel_range)] = random.choice(self._colors)
+
+
+class Solid(LightPattern):
+    """Un color fijo en todos los pixeles del rango."""
+
+    def __init__(self, color, pixel_range=BOTH):
+        self._color = color
+        self._pixel_range = pixel_range
+
+    def step(self, pixels):
+        for i in self._pixel_range:
+            pixels[i] = self._color
+
 
 # Colores tipicos de un logic display de R2-D2: blanco, azul y rojo.
-_LOGIC_DISPLAY_COLORS = [(255, 255, 255), (0, 80, 255), (255, 0, 0)]
-_OFF = (0, 0, 0)
+DEFAULT_PATTERN = Flicker([(255, 255, 255), (0, 80, 255), (255, 0, 0)])
 
 
 class DomeLights:
-    """Maneja los 2 sticks de NeoPixel como una sola tira SPI de 16 LEDs."""
+    """Corre un LightPattern de fondo en un hilo propio, para siempre."""
 
-    def __init__(self, exit_stack, brightness=0.4, flicker_seconds=0.15):
-        self._flicker_seconds = flicker_seconds
+    def __init__(self, exit_stack, brightness=0.4, default_pattern=DEFAULT_PATTERN):
         spi = busio.SPI(board.SCK, MOSI=board.MOSI)
         self._pixels = neopixel.NeoPixel_SPI(
             spi,
@@ -43,49 +85,34 @@ class DomeLights:
             pixel_order=neopixel.GRB,
             auto_write=False,
         )
-        self._pattern_thread = None
-        self._stop_pattern = None
-        exit_stack.callback(self.off)
+        self._default_pattern = default_pattern
+        self._pattern = default_pattern
+        self._revert_at = None
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread = threading.Thread(target=self._run, daemon=True)
+        self._thread.start()
+        exit_stack.callback(self._shutdown)
 
-    def off(self):
-        self._stop_flicker()
-        self._pixels.fill(_OFF)
-        self._pixels.show()
+    def trigger(self, pattern, duration):
+        """Cambia al patron dado por `duration` segundos; al vencer, vuelve
+        sola al patron por defecto."""
+        with self._lock:
+            self._pattern = pattern
+            self._revert_at = time.monotonic() + duration
 
-    def fill(self, color, side='both'):
-        self._stop_flicker()
-        self._set(side, color)
-        self._pixels.show()
-
-    def flicker(self, colors=_LOGIC_DISPLAY_COLORS, side='both'):
-        """Prende cada LED del cuadrante con un color al azar, cambiando
-        uno a la vez -- el efecto clasico de "computadora pensando"."""
-        if self._pattern_thread:
-            return
-        pixel_range = {'left': range(0, _PIXELS_PER_STICK),
-                        'right': range(_PIXELS_PER_STICK, _NUM_PIXELS),
-                        'both': range(0, _NUM_PIXELS)}[side]
-        self._stop_pattern = threading.Event()
-
-        def _run():
-            while not self._stop_pattern.is_set():
-                self._pixels[random.choice(pixel_range)] = random.choice(colors)
-                self._pixels.show()
-                self._stop_pattern.wait(self._flicker_seconds)
-            self._pixels.fill(_OFF)
+    def _run(self):
+        while not self._stop.wait(_TICK_SECONDS):
+            with self._lock:
+                if self._revert_at is not None and time.monotonic() >= self._revert_at:
+                    self._pattern = self._default_pattern
+                    self._revert_at = None
+                pattern = self._pattern
+            pattern.step(self._pixels)
             self._pixels.show()
 
-        self._pattern_thread = threading.Thread(target=_run, daemon=True)
-        self._pattern_thread.start()
-
-    def _set(self, side, color):
-        if side in ('left', 'both'):
-            self._pixels[_LEFT] = [color] * _PIXELS_PER_STICK
-        if side in ('right', 'both'):
-            self._pixels[_RIGHT] = [color] * _PIXELS_PER_STICK
-
-    def _stop_flicker(self):
-        if self._pattern_thread:
-            self._stop_pattern.set()
-            self._pattern_thread.join()
-            self._pattern_thread = None
+    def _shutdown(self):
+        self._stop.set()
+        self._thread.join()
+        self._pixels.fill(_OFF)
+        self._pixels.show()
