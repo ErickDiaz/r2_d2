@@ -4,6 +4,9 @@ Home Assistant.
 
 Configuration via environment variables (or a .env file in this directory):
   VOSK_MODEL_PATH          path to an unzipped Vosk model directory (required)
+  VOSK_WAKEWORD_MODEL_PATH path to a separate (ideally smaller/faster) Vosk model
+                           for wake-word detection, which runs continuously on every
+                           audio chunk (optional; defaults to VOSK_MODEL_PATH)
   WAKE_PHRASE              phrase that triggers listening (default: "arturito")
   IDLE_CHATTER_MIN_SECONDS minimum gap between idle sounds (default: 5400, 1.5h)
   IDLE_CHATTER_MAX_SECONDS maximum gap between idle sounds (default: 10800, 3h)
@@ -50,6 +53,10 @@ CHUNK_SIZE = 4000  # 0.25s @ 16kHz
 ACK_SOUNDS = ['beep_qword4', 'beep_qword1', 'sad', 'proud']
 
 VOSK_MODEL_PATH = os.environ['VOSK_MODEL_PATH']
+# Modelo separado (mas chico/rapido) para el wake word, que corre sobre
+# cada segmento de audio todo el tiempo -- si no se configura, se usa el
+# mismo modelo para todo (ok si VOSK_MODEL_PATH ya es un modelo chico).
+VOSK_WAKEWORD_MODEL_PATH = os.getenv('VOSK_WAKEWORD_MODEL_PATH', VOSK_MODEL_PATH)
 WAKE_PHRASE = os.getenv('WAKE_PHRASE', 'arturito')
 IDLE_CHATTER_MIN_SECONDS = float(os.getenv('IDLE_CHATTER_MIN_SECONDS', 5400))
 IDLE_CHATTER_MAX_SECONDS = float(os.getenv('IDLE_CHATTER_MAX_SECONDS', 10800))
@@ -75,8 +82,12 @@ def _resolve_input_device(name_substring, retries=5, retry_seconds=1):
 
 
 def main():
-    model = vosk.Model(VOSK_MODEL_PATH)
-    detector = VoskWakeWordDetector(model, WAKE_PHRASE, sample_rate=SAMPLE_RATE)
+    wakeword_model = vosk.Model(VOSK_WAKEWORD_MODEL_PATH)
+    model = (
+        wakeword_model if VOSK_WAKEWORD_MODEL_PATH == VOSK_MODEL_PATH
+        else vosk.Model(VOSK_MODEL_PATH)
+    )
+    detector = VoskWakeWordDetector(wakeword_model, WAKE_PHRASE, sample_rate=SAMPLE_RATE)
     transcriber = VoskTranscriber(model, sample_rate=SAMPLE_RATE)
     sounds = SoundBoard(mixer)
     IdleChatter(sounds, sounds.names, IDLE_CHATTER_MIN_SECONDS, IDLE_CHATTER_MAX_SECONDS).start()
