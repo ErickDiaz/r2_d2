@@ -50,7 +50,14 @@ _DEFAULT_TICK_SECONDS = 0.2
 class LightPattern:
     """Una animacion de las luces del domo. DomeLights llama a step() una
     vez por tick; la implementacion cambia los pixeles que quiera y
-    devuelve cuantos segundos esperar hasta el proximo tick."""
+    devuelve cuantos segundos esperar hasta el proximo tick. on_activate()
+    se llama una sola vez, apenas este patron pasa a ser el activo -- sirve
+    para repintar todo de golpe en vez de esperar a que step() vaya
+    llegando a cada pixel de a uno (lo que dejaria pixeles del patron
+    anterior "colgados" un rato)."""
+
+    def on_activate(self, pixels):
+        pass
 
     def step(self, pixels):
         raise NotImplementedError
@@ -61,11 +68,15 @@ class Flicker(LightPattern):
     azar entre min_seconds y max_seconds -- el look clasico de "computadora
     pensando" de un logic display."""
 
-    def __init__(self, colors, pixel_range=BOTH, min_seconds=0.5, max_seconds=1.0):
+    def __init__(self, colors, pixel_range=BOTH, min_seconds=0.1, max_seconds=0.5):
         self._colors = colors
         self._pixel_range = pixel_range
         self._min_seconds = min_seconds
         self._max_seconds = max_seconds
+
+    def on_activate(self, pixels):
+        for i in self._pixel_range:
+            pixels[i] = random.choice(self._colors)
 
     def step(self, pixels):
         pixels[random.choice(self._pixel_range)] = random.choice(self._colors)
@@ -89,7 +100,7 @@ class Solid(LightPattern):
 # Colores de un logic display de R2-D2 (segun referencia real): blanco,
 # amarillo, azul y verde -- sin rojo, que es color exclusivo de la luz del
 # boton (ver led_status.py), no del domo. Parpadeo a ritmo al azar entre
-# 0.5 y 1 segundo por cambio.
+# 0.1 y 0.5 segundos por cambio.
 DEFAULT_PATTERN = Flicker([(255, 255, 255), (255, 200, 0), (0, 80, 255), (0, 255, 0)])
 
 
@@ -119,16 +130,19 @@ class DomeLights:
         sola al patron por defecto. Para eventos de duracion desconocida
         (p.ej. mientras dura un sonido), usar una duracion holgada y llamar
         a revert() apenas se sepa que el evento termino."""
-        with self._lock:
-            self._pattern = pattern
-            self._revert_at = time.monotonic() + duration
+        self._switch_to(pattern, time.monotonic() + duration)
 
     def revert(self):
         """Vuelve al patron por defecto ya mismo, sin esperar a que venza
         la duracion de un trigger() anterior."""
+        self._switch_to(self._default_pattern, None)
+
+    def _switch_to(self, pattern, revert_at):
         with self._lock:
-            self._pattern = self._default_pattern
-            self._revert_at = None
+            self._pattern = pattern
+            self._revert_at = revert_at
+            pattern.on_activate(self._pixels)
+            self._pixels.show()
 
     def _run(self):
         delay = 0
@@ -137,9 +151,10 @@ class DomeLights:
                 if self._revert_at is not None and time.monotonic() >= self._revert_at:
                     self._pattern = self._default_pattern
                     self._revert_at = None
+                    self._pattern.on_activate(self._pixels)
                 pattern = self._pattern
-            delay = pattern.step(self._pixels)
-            self._pixels.show()
+                delay = pattern.step(self._pixels)
+                self._pixels.show()
 
     def _shutdown(self):
         self._stop.set()
