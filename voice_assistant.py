@@ -14,6 +14,9 @@ Configuration via environment variables (or a .env file in this directory):
   GEMINI_MODEL             Gemini model name (default: gemini-flash-latest)
   PIPER_BIN                path to the piper binary, for a natural TTS voice (optional)
   PIPER_MODEL              path to a piper .onnx voice model (optional)
+  AUDIO_INPUT_DEVICE       substring to match a specific input device name, for when
+                           the system "default" doesn't route to the right mic
+                           (optional; see `python3 -m sounddevice` for device names)
 """
 
 import os
@@ -52,6 +55,16 @@ IDLE_CHATTER_MAX_SECONDS = float(os.getenv('IDLE_CHATTER_MAX_SECONDS', 10800))
 HA_COMMANDS_PATH = os.getenv('HA_COMMANDS_PATH', 'smart_home_commands.json')
 GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
+AUDIO_INPUT_DEVICE = os.getenv('AUDIO_INPUT_DEVICE')
+
+
+def _resolve_input_device(name_substring):
+    if not name_substring:
+        return None
+    for index, info in enumerate(sd.query_devices()):
+        if info['max_input_channels'] > 0 and name_substring.lower() in info['name'].lower():
+            return index
+    raise RuntimeError('AUDIO_INPUT_DEVICE=%r no coincide con ningun dispositivo de entrada' % name_substring)
 
 
 def main():
@@ -81,7 +94,10 @@ def main():
         # acordarse de revertirlo despues.
         DomeLights(stack)
         stream = stack.enter_context(
-            sd.InputStream(samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE)
+            sd.InputStream(
+                samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE,
+                device=_resolve_input_device(AUDIO_INPUT_DEVICE),
+            )
         )
 
         def read_chunk(size):
