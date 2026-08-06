@@ -14,7 +14,10 @@ DomeLights corre un LightPattern de fondo en un hilo propio, para siempre
 (por defecto Flicker, el look de "logic display"). trigger() cambia el
 patron activo por una duracion determinada -- para reaccionar a un evento
 puntual -- y al vencer ese tiempo vuelve sola al patron por defecto, sin
-que el resto del codigo tenga que acordarse de revertirlo.
+que el resto del codigo tenga que acordarse de revertirlo. Si la duracion
+del evento no se conoce de antemano (p.ej. mientras dura un sonido),
+revert() fuerza la vuelta al patron por defecto en el momento exacto en
+que se sabe que el evento termino.
 """
 
 import random
@@ -41,44 +44,52 @@ RIGHT = range(_PIXELS_PER_STICK, _NUM_PIXELS)
 BOTH = range(0, _NUM_PIXELS)
 
 _OFF = (0, 0, 0)
-_TICK_SECONDS = 0.15
+_DEFAULT_TICK_SECONDS = 0.2
 
 
 class LightPattern:
     """Una animacion de las luces del domo. DomeLights llama a step() una
-    vez por tick; la implementacion decide que pixeles cambiar."""
+    vez por tick; la implementacion cambia los pixeles que quiera y
+    devuelve cuantos segundos esperar hasta el proximo tick."""
 
     def step(self, pixels):
         raise NotImplementedError
 
 
 class Flicker(LightPattern):
-    """Prende un pixel al azar con un color al azar por tick -- el look
-    clasico de "computadora pensando" de un logic display."""
+    """Prende un pixel al azar con un color al azar, a un ritmo tambien al
+    azar entre min_seconds y max_seconds -- el look clasico de "computadora
+    pensando" de un logic display."""
 
-    def __init__(self, colors, pixel_range=BOTH):
+    def __init__(self, colors, pixel_range=BOTH, min_seconds=0.5, max_seconds=1.0):
         self._colors = colors
         self._pixel_range = pixel_range
+        self._min_seconds = min_seconds
+        self._max_seconds = max_seconds
 
     def step(self, pixels):
         pixels[random.choice(self._pixel_range)] = random.choice(self._colors)
+        return random.uniform(self._min_seconds, self._max_seconds)
 
 
 class Solid(LightPattern):
     """Un color fijo en todos los pixeles del rango."""
 
-    def __init__(self, color, pixel_range=BOTH):
+    def __init__(self, color, pixel_range=BOTH, tick_seconds=_DEFAULT_TICK_SECONDS):
         self._color = color
         self._pixel_range = pixel_range
+        self._tick_seconds = tick_seconds
 
     def step(self, pixels):
         for i in self._pixel_range:
             pixels[i] = self._color
+        return self._tick_seconds
 
 
 # Colores de un logic display de R2-D2 (segun referencia real): blanco,
 # amarillo, azul y verde -- sin rojo, que es color exclusivo de la luz del
-# boton (ver led_status.py), no del domo.
+# boton (ver led_status.py), no del domo. Parpadeo a ritmo al azar entre
+# 0.5 y 1 segundo por cambio.
 DEFAULT_PATTERN = Flicker([(255, 255, 255), (255, 200, 0), (0, 80, 255), (0, 255, 0)])
 
 
@@ -105,19 +116,29 @@ class DomeLights:
 
     def trigger(self, pattern, duration):
         """Cambia al patron dado por `duration` segundos; al vencer, vuelve
-        sola al patron por defecto."""
+        sola al patron por defecto. Para eventos de duracion desconocida
+        (p.ej. mientras dura un sonido), usar una duracion holgada y llamar
+        a revert() apenas se sepa que el evento termino."""
         with self._lock:
             self._pattern = pattern
             self._revert_at = time.monotonic() + duration
 
+    def revert(self):
+        """Vuelve al patron por defecto ya mismo, sin esperar a que venza
+        la duracion de un trigger() anterior."""
+        with self._lock:
+            self._pattern = self._default_pattern
+            self._revert_at = None
+
     def _run(self):
-        while not self._stop.wait(_TICK_SECONDS):
+        delay = 0
+        while not self._stop.wait(delay):
             with self._lock:
                 if self._revert_at is not None and time.monotonic() >= self._revert_at:
                     self._pattern = self._default_pattern
                     self._revert_at = None
                 pattern = self._pattern
-            pattern.step(self._pixels)
+            delay = pattern.step(self._pixels)
             self._pixels.show()
 
     def _shutdown(self):

@@ -35,7 +35,7 @@ import vosk
 from pygame import mixer
 
 import text_to_speech
-from dome_lights import DomeLights
+from dome_lights import DomeLights, Solid
 from gemini_assistant import GeminiAssistant
 from home_assistant import HomeAssistantClient
 from idle_chatter import IdleChatter
@@ -107,11 +107,12 @@ def main():
         led = LedStatus(stack)
         # Luces del domo: arrancan solas con su patron por defecto (logic
         # display) y corren de fondo, sin relacion con el estado de
-        # escucha/pensando del boton. dome_lights.trigger(pattern,
-        # duration) permite reaccionar a un evento puntual sin tener que
-        # acordarse de revertirlo despues.
+        # escucha/pensando del boton. Al detectar la wake word se las pone
+        # en rojo fijo mientras dura el sonido de confirmacion, y vuelven
+        # solas al patron por defecto apenas termina (ver mas abajo).
+        dome_lights = None
         try:
-            DomeLights(stack)
+            dome_lights = DomeLights(stack)
         except Exception as error:
             print('Luces del domo deshabilitadas (SPI no disponible?):', error)
         stream = stack.enter_context(
@@ -135,9 +136,16 @@ def main():
 
             print('Wake word/boton detectado')
             led.listening()
+            if dome_lights:
+                # Duracion holgada como techo de seguridad; revert() de
+                # abajo ya fuerza la vuelta al patron por defecto apenas
+                # termina el sonido, sin esperar a que venza esto.
+                dome_lights.trigger(Solid((255, 0, 0)), duration=30)
             # wait=True: don't start listening for the command until the R2-D2
             # sound effect finishes, or the mic picks up its own speaker output.
             sounds.play_random(ACK_SOUNDS, wait=True)
+            if dome_lights:
+                dome_lights.revert()
             # The mic kept recording into its buffer while we were blocked
             # above; discard that backlog so transcribe() starts on live
             # audio instead of replaying stale silence first.
