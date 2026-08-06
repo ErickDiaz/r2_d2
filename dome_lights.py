@@ -66,7 +66,10 @@ class LightPattern:
 class Flicker(LightPattern):
     """Prende un pixel al azar con un color al azar, a un ritmo tambien al
     azar entre min_seconds y max_seconds -- el look clasico de "computadora
-    pensando" de un logic display."""
+    pensando" de un logic display. `colors` puede ser una lista fija de
+    colores (se elige uno al azar por pixel) o una funcion sin argumentos
+    que genere un color nuevo cada vez (para variar tonos dentro de un
+    mismo color, no solo elegir entre unos pocos fijos)."""
 
     def __init__(self, colors, pixel_range=BOTH, min_seconds=0.1, max_seconds=0.5):
         self._colors = colors
@@ -74,12 +77,15 @@ class Flicker(LightPattern):
         self._min_seconds = min_seconds
         self._max_seconds = max_seconds
 
+    def _pick_color(self):
+        return self._colors() if callable(self._colors) else random.choice(self._colors)
+
     def on_activate(self, pixels):
         for i in self._pixel_range:
-            pixels[i] = random.choice(self._colors)
+            pixels[i] = self._pick_color()
 
     def step(self, pixels):
-        pixels[random.choice(self._pixel_range)] = random.choice(self._colors)
+        pixels[random.choice(self._pixel_range)] = self._pick_color()
         return random.uniform(self._min_seconds, self._max_seconds)
 
 
@@ -97,11 +103,16 @@ class Solid(LightPattern):
         return self._tick_seconds
 
 
-# Colores de un logic display de R2-D2 (segun referencia real): blanco,
-# amarillo, azul y verde -- sin rojo, que es color exclusivo de la luz del
-# boton (ver led_status.py), no del domo. Parpadeo a ritmo al azar entre
-# 0.1 y 0.5 segundos por cambio.
-DEFAULT_PATTERN = Flicker([(255, 255, 255), (255, 200, 0), (0, 80, 255), (0, 255, 0)])
+def random_blue():
+    """Un tono de azul al azar -- rojo y verde bajos, azul siempre alto,
+    para que el resultado se perciba como "azul" pero variando entre un
+    celeste brillante y un azul mas oscuro/profundo."""
+    return (random.randint(0, 40), random.randint(0, 90), random.randint(140, 255))
+
+
+# Parpadeo a ritmo al azar entre 0.1 y 0.5 segundos por cambio, con tonos
+# de azul generados al vuelo (no una lista fija de colores).
+DEFAULT_PATTERN = Flicker(random_blue)
 
 
 class DomeLights:
