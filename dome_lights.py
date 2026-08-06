@@ -76,8 +76,10 @@ class Solid(LightPattern):
             pixels[i] = self._color
 
 
-# Colores tipicos de un logic display de R2-D2: blanco, azul y rojo.
-DEFAULT_PATTERN = Flicker([(255, 255, 255), (0, 80, 255), (255, 0, 0)])
+# Colores de un logic display de R2-D2 (segun referencia real): blanco,
+# amarillo, azul y verde -- sin rojo, que es color exclusivo de la luz del
+# boton (ver led_status.py), no del domo.
+DEFAULT_PATTERN = Flicker([(255, 255, 255), (255, 200, 0), (0, 80, 255), (0, 255, 0)])
 
 
 class DomeLights:
