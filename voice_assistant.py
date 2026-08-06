@@ -92,7 +92,10 @@ def main():
         # escucha/pensando del boton. dome_lights.trigger(pattern,
         # duration) permite reaccionar a un evento puntual sin tener que
         # acordarse de revertirlo despues.
-        DomeLights(stack)
+        try:
+            DomeLights(stack)
+        except Exception as error:
+            print('Luces del domo deshabilitadas (SPI no disponible?):', error)
         stream = stack.enter_context(
             sd.InputStream(
                 samplerate=SAMPLE_RATE, channels=1, dtype='int16', blocksize=CHUNK_SIZE,
