@@ -20,6 +20,7 @@ Configuration via environment variables (or a .env file in this directory):
 """
 
 import os
+import time
 from contextlib import ExitStack
 
 from dotenv import load_dotenv
@@ -58,12 +59,18 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
 AUDIO_INPUT_DEVICE = os.getenv('AUDIO_INPUT_DEVICE')
 
 
-def _resolve_input_device(name_substring):
+def _resolve_input_device(name_substring, retries=5, retry_seconds=1):
+    # La enumeracion de dispositivos USB puede no estar lista todavia justo
+    # al arrancar (carrera con el resto de la inicializacion); reintentar
+    # evita que el arranque falle por una condicion transitoria.
     if not name_substring:
         return None
-    for index, info in enumerate(sd.query_devices()):
-        if info['max_input_channels'] > 0 and name_substring.lower() in info['name'].lower():
-            return index
+    for attempt in range(retries):
+        for index, info in enumerate(sd.query_devices()):
+            if info['max_input_channels'] > 0 and name_substring.lower() in info['name'].lower():
+                return index
+        if attempt < retries - 1:
+            time.sleep(retry_seconds)
     raise RuntimeError('AUDIO_INPUT_DEVICE=%r no coincide con ningun dispositivo de entrada' % name_substring)
 
 
