@@ -35,6 +35,16 @@ que el de la Pi — si algún color queda muy tenue, puede necesitar una
 resistencia más chica (probá 330Ω) o, si sigue muy débil, un transistor NPN
 chico como driver en vez de conectar el LED directo al pin.
 
+**Botón en la Jetson -- resistencia de pull-up obligatoria**: a diferencia
+de `gpiozero` en la Pi, `Jetson.GPIO` **no puede configurar pull-up/pull-down
+por software** (limitación conocida de la librería, confirmada en
+[NVIDIA/jetson-gpio#5](https://github.com/NVIDIA/jetson-gpio/issues/5) --
+`GPIO.setup(pin, GPIO.IN, pull_up_down=GPIO.PUD_UP)` no hace nada real en
+Jetson). Sin resistencia externa el pin queda flotando y se lee como
+presionado todo el tiempo. Hay que agregar una **resistencia de 1k-10kΩ
+entre el pin físico 16 (botón) y el pin físico 17 (3.3V)**, además del
+cableado ya descrito (switch a pin 16 y GND a pin 14).
+
 ## Qué vas a necesitar
 
 - Multímetro (con modo de continuidad y modo de diodo/`diode test`) — **no
@@ -77,6 +87,7 @@ Con la placa **apagada**:
 |---|---|
 | Switch, cable 1 | Pin físico **16** |
 | Switch, cable 2 | Cualquier `GND` — pin físico **14** (está justo al lado) |
+| Resistencia de pull-up (**solo Jetson**, ver nota más abajo) | 1k-10kΩ entre pin físico **16** y pin físico **17** (3.3V) |
 | LED, común (`+`) | Pin físico **22** (sin resistencia — es la alimentación compartida) |
 | LED, cátodo 1 | Resistencia de 330Ω-1kΩ → pin físico **15** |
 | LED, cátodo 2 | Resistencia de 330Ω-1kΩ → pin físico **13** |
