@@ -25,6 +25,13 @@ import board
 import busio
 import neopixel_spi as neopixel
 
+# Importar `board` deja el modo interno de Jetson.GPIO fijado en su propio
+# esquema de pines (TEGRA_SOC), como efecto secundario -- lo cual rompe a
+# led_status.py/push_to_talk.py cuando despues intentan fijar el modo BOARD.
+# cleanup() resetea ese estado para que puedan setearlo ellos.
+import Jetson.GPIO as _GPIO
+_GPIO.cleanup()
+
 _PIXELS_PER_STICK = 8
 _NUM_STICKS = 2
 _NUM_PIXELS = _PIXELS_PER_STICK * _NUM_STICKS
