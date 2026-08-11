@@ -66,13 +66,20 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
 AUDIO_INPUT_DEVICE = os.getenv('AUDIO_INPUT_DEVICE')
 
 
-def _resolve_input_device(name_substring, retries=20, retry_seconds=1.5):
+def _resolve_input_device(name_substring, retries=10, retry_seconds=1.5):
     # La enumeracion de dispositivos USB puede no estar lista todavia justo
-    # al arrancar (carrera con el resto de la inicializacion); reintentar
-    # evita que el arranque falle por una condicion transitoria.
+    # al arrancar (carrera con el resto de la inicializacion). PortAudio's
+    # backend de PulseAudio ademas no siempre re-escanea solo -- si el
+    # dispositivo aparecio despues de la primera consulta, un query_devices()
+    # repetido en el mismo proceso puede seguir devolviendo la lista vieja
+    # para siempre. Reinicializar PortAudio (_terminate/_initialize) antes
+    # de cada intento fuerza un escaneo nuevo de verdad.
     if not name_substring:
         return None
     for attempt in range(retries):
+        if attempt > 0:
+            sd._terminate()
+            sd._initialize()
         for index, info in enumerate(sd.query_devices()):
             if info['max_input_channels'] > 0 and name_substring.lower() in info['name'].lower():
                 return index
