@@ -66,7 +66,7 @@ GEMINI_MODEL = os.getenv('GEMINI_MODEL', 'gemini-flash-latest')
 AUDIO_INPUT_DEVICE = os.getenv('AUDIO_INPUT_DEVICE')
 
 
-def _resolve_input_device(name_substring, retries=5, retry_seconds=1):
+def _resolve_input_device(name_substring, retries=20, retry_seconds=1.5):
     # La enumeracion de dispositivos USB puede no estar lista todavia justo
     # al arrancar (carrera con el resto de la inicializacion); reintentar
     # evita que el arranque falle por una condicion transitoria.
