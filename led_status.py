@@ -1,9 +1,10 @@
-"""RGB LED status feedback via 4 GPIO pins on the button's common-anode
-RGB LED: shared anode (physical pin 22) plus three individual color
-cathodes -- red (physical pin 15), green (physical pin 13), blue (physical
-pin 18). Same physical pins on both the Raspberry Pi and the Jetson Nano's
-J41 header (see BUTTON_WIRING.md). Uses Jetson.GPIO in BOARD mode, since
-gpiozero doesn't support Jetson boards.
+"""RGB LED status feedback via 3 GPIO pins on the button's common-anode
+RGB LED: red (physical pin 15), green (physical pin 13), blue (physical
+pin 18). The shared anode is wired straight to a 5V pin (physical pin 2
+or 4), not to a GPIO pin -- the Jetson's GPIO can't source enough current
+to light the LED brightly (see BUTTON_WIRING.md). Same physical pins on
+both the Raspberry Pi and the Jetson Nano's J41 header. Uses Jetson.GPIO
+in BOARD mode, since gpiozero doesn't support Jetson boards.
 """
 
 import random
@@ -11,7 +12,6 @@ import threading
 
 import Jetson.GPIO as GPIO
 
-_COMMON_PIN = 22
 _RED_PIN = 15
 _GREEN_PIN = 13
 _BLUE_PIN = 18
@@ -23,10 +23,9 @@ class LedStatus:
     def __init__(self, exit_stack, blink_seconds=0.3):
         self._blink_seconds = blink_seconds
         GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(_COMMON_PIN, GPIO.OUT, initial=GPIO.HIGH)
         for pin in (_RED_PIN, _GREEN_PIN, _BLUE_PIN):
             GPIO.setup(pin, GPIO.OUT, initial=GPIO.HIGH)
-        exit_stack.callback(GPIO.cleanup, [_COMMON_PIN, _RED_PIN, _GREEN_PIN, _BLUE_PIN])
+        exit_stack.callback(GPIO.cleanup, [_RED_PIN, _GREEN_PIN, _BLUE_PIN])
         self._pattern_thread = None
         self._stop_pattern = None
 

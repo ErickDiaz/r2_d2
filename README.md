@@ -246,9 +246,10 @@ uso.
   `PIPER_MODEL` están seteados) si está disponible, si no `aiy.voice.tts`
   (pico2wave), si no `espeak-ng`, si no hay ninguno solo loggea.
 - **`led_status.LedStatus`** — controla el LED RGB del botón vía
-  `Jetson.GPIO` (ánodo común en pin físico 22 + cátodos rojo/verde/azul en
-  pines físicos 15/13/18, ver [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): rojo
-  fijo escuchando, rojo/azul al azar (hilo + `time.sleep`, ya que
+  `Jetson.GPIO` (cátodos rojo/verde/azul en pines físicos 15/13/18; el
+  ánodo común va cableado directo a 5V, no a un pin GPIO, por brillo — ver
+  [`BUTTON_WIRING.md`](BUTTON_WIRING.md)): rojo fijo escuchando, rojo/azul
+  al azar (hilo + `time.sleep`, ya que
   `Jetson.GPIO` no trae un helper de blink como `gpiozero`) mientras
   procesa, apagado en espera.
 - **`push_to_talk.PushToTalkButton`** — lee el botón físico vía
