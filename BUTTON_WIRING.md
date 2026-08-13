@@ -20,7 +20,7 @@ prende ese color. El botón (switch) es aparte, 2 cables más.
 | Función | Pin físico | BCM (solo Pi) |
 |---|---|---|
 | Botón (switch) | **16** | GPIO23 |
-| LED, común (`+`) | **2 o 4** (5V, no GPIO) | Pin 2 en la Pi es tambien 5V |
+| LED, común (`+`) | **22** | GPIO25 |
 | LED, rojo | **15** | GPIO22 |
 | LED, verde | **13** | GPIO27 |
 | LED, azul | **18** | GPIO24 |
@@ -30,17 +30,10 @@ del repo oficial de Google. Los pines de rojo/verde/azul se identificaron
 a mano en este mismo hardware (ver "Identificar los canales de color" más
 abajo) — no hay un código de colores documentado para este cable.
 
-**Nota eléctrica para Jetson -- por que el comun va a 5V y no a un pin
-GPIO**: el GPIO de la Jetson entrega mucha menos corriente que el de la
-Pi (el header pasa por un chip level-shifter, TXB0108, pensado para
-señales debiles, no para alimentar un LED). Con el comun en un pin GPIO
-a 3.3V el LED sale visiblemente tenue. Conectarlo directo a un pin de
-**5V** (sin GPIO de por medio) da mas brillo sin agregar transistores --
-es un aumento moderado de corriente (no un salto grande) sobre lo que ya
-circulaba, dado que el chip de la Jetson esta disenado para tolerar ser
-"forzado" por un driver externo. Si en algun momento el brillo sigue sin
-convencer, la alternativa mas conservadora es un transistor NPN
-(2N2222/BC547) por color como interruptor, con el comun a 3.3V.
+**Nota eléctrica para Jetson**: el GPIO de la Jetson entrega menos corriente
+que el de la Pi — si algún color queda muy tenue, puede necesitar una
+resistencia más chica (probá 330Ω) o, si sigue muy débil, un transistor NPN
+chico como driver en vez de conectar el LED directo al pin.
 
 **Botón en la Jetson -- resistencia de pull-up obligatoria**: a diferencia
 de `gpiozero` en la Pi, `Jetson.GPIO` **no puede configurar pull-up/pull-down
@@ -95,7 +88,7 @@ Con la placa **apagada**:
 | Switch, cable 1 | Pin físico **16** |
 | Switch, cable 2 | Cualquier `GND` — pin físico **14** (está justo al lado) |
 | Resistencia de pull-up (**solo Jetson**, ver nota más abajo) | 1k-10kΩ entre pin físico **16** y pin físico **17** (3.3V) |
-| LED, común (`+`) | Pin físico **2 o 4** (5V, sin resistencia — es la alimentación compartida) |
+| LED, común (`+`) | Pin físico **22** (sin resistencia — es la alimentación compartida) |
 | LED, cátodo 1 | Resistencia de 330Ω-1kΩ → pin físico **15** |
 | LED, cátodo 2 | Resistencia de 330Ω-1kΩ → pin físico **13** |
 | LED, cátodo 3 | Resistencia de 330Ω-1kΩ → pin físico **18** |
@@ -108,12 +101,11 @@ Numeración de pines físicos del header de 40 pines (mirando la placa con el
 puerto USB hacia abajo, pin 1 arriba a la izquierda) — igual en Pi y Jetson:
 
 ```
-        1   2  <-- 5V, LED comun
-        3   4  <-- 5V (alternativa)
-        ...
         13  14 <-- GND
         15  16 <-- boton
         17  18
+             ...
+        21  22 <-- LED comun
 ```
 
 Si el conector del botón termina en un JST que no entra en el header,
@@ -139,10 +131,10 @@ cátodos en otro orden — o intercambiá los cables físicamente, o ajustá las
 constantes `_RED_PIN`/`_GREEN_PIN`/`_BLUE_PIN` en `led_status.py` para que
 coincidan con cómo quedó tu cableado real.
 
-Si el LED no prende: revisá que el común (pin 2 o 4) tenga buen contacto.
-Si el botón no responde: revisá el `GND` del switch (pin 14) y la
-resistencia de pull-up -- son circuitos independientes del LED ahora que
-el común va a 5V en vez de a un pin GPIO compartido.
+Si el botón no se detecta o el LED no prende: revisá que el común (pin 22)
+y el `GND` del switch tengan buen contacto — ambos circuitos comparten
+tierra, así que una conexión floja ahí puede hacer que ninguno de los dos
+responda aunque el cableado se vea bien a simple vista.
 
 ## Una vez que funciona
 
