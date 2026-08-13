@@ -31,7 +31,7 @@ def _piper():
         _piper_process = subprocess.Popen(
             [PIPER_BIN, '--model', PIPER_MODEL, '--output_dir', _PIPER_OUTPUT_DIR],
             stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-            text=True,
+            universal_newlines=True,  # 'text=True' equivalente, pero 'text' recien existe desde Python 3.7
         )
     return _piper_process
 
