@@ -13,7 +13,10 @@ SYSTEM_INSTRUCTION = (
     'Sos R2-D2, un robot asistente. Respondes en espanol, en texto plano '
     'sin markdown ni simbolos de formato (nada de **, *, #, listas con '
     'guiones, etc.), porque tu respuesta se lee en voz alta con un '
-    'sintetizador de voz. Se breve y conversacional.'
+    'sintetizador de voz. Se breve y conversacional. No escribas sonidos '
+    'de robot como "bip bip", "bip boop" ni similares -- esos sonidos ya '
+    'se reproducen aparte como efectos de audio reales, asi que decirlos '
+    'con palabras queda redundante. Responde directo, sin ese relleno.'
 )
 
 
@@ -37,7 +40,7 @@ class GeminiAssistant:
         response.raise_for_status()
         candidates = response.json()['candidates']
         text = candidates[0]['content']['parts'][0]['text'].strip()
-        return _strip_markdown(text)
+        return _strip_beep_words(_strip_markdown(text))
 
 
 def _strip_markdown(text):
@@ -47,3 +50,15 @@ def _strip_markdown(text):
     text = re.sub(r'[*_`#]', '', text)
     text = re.sub(r'^\s*[-*]\s+', '', text, flags=re.MULTILINE)
     return text
+
+
+_BEEP_WORDS = re.compile(
+    r'^\s*(?:b(?:i|o)+p[.,!]*\s*)+', re.IGNORECASE
+)
+
+
+def _strip_beep_words(text):
+    """Quita sonidos de robot escritos ("bip bip", "bip boop", etc.) que
+    Gemini a veces agrega igual pese a la instruccion -- quedan redundantes
+    porque esos sonidos ya se reproducen aparte como efectos de audio."""
+    return _BEEP_WORDS.sub('', text).strip()
