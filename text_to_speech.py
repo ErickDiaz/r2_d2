@@ -61,7 +61,10 @@ def _say_piper(text, timeout=15):
         last_size = size
         time.sleep(0.1)
 
-    subprocess.run(['aplay', '-q', new_file], check=True)
+    # -D pulse (no el "default" de ALSA a secas): en equipos con PulseAudio
+    # corriendo (p.ej. la Jetson), el default de ALSA puede no coincidir
+    # con el sink que PulseAudio tiene configurado como salida real.
+    subprocess.run(['aplay', '-q', '-D', 'pulse', new_file], check=True)
     os.remove(new_file)
 
 
